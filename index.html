@@ -1,0 +1,1287 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Once upon a Time灣</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'PingFang TC','微軟正黑體','Microsoft JhengHei',sans-serif;
+  background: #f5f0e8; color: #111; min-height: 100vh; overflow-x: hidden; }
+
+/* 速度線背景 */
+.speed-bg { position:fixed; inset:0; z-index:0; pointer-events:none; overflow:hidden; background:#fafaf5; }
+.speed-bg svg { width:100%; height:100%; position:absolute; inset:0; }
+.halftone { position:fixed; inset:0; z-index:0; pointer-events:none; opacity:0.04;
+  background-image:radial-gradient(circle,#000 1.2px,transparent 1.2px); background-size:14px 14px; }
+
+.wrap { position:relative; z-index:2; max-width:1280px; margin:0 auto; padding:10px 14px; }
+
+/* ── 起始畫面 ── */
+#screen-splash {
+  position:fixed; inset:0; z-index:200;
+  background:#0a0614;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  overflow:hidden;
+}
+#screen-splash.gone { display:none; }
+
+/* 時光機星空 */
+.splash-stars { position:absolute; inset:0; pointer-events:none; }
+.splash-tunnel {
+  position:absolute; inset:0; pointer-events:none;
+  background:
+    radial-gradient(ellipse at 50% 50%, rgba(120,60,220,0.15) 0%, transparent 60%),
+    radial-gradient(ellipse at 50% 50%, rgba(60,120,255,0.1) 0%, transparent 80%);
+}
+/* 時光隧道線條 */
+.tunnel-lines { position:absolute; inset:0; pointer-events:none; overflow:hidden; }
+.tunnel-lines svg { width:100%; height:100%; animation:tunnel-zoom 3s linear infinite; }
+@keyframes tunnel-zoom { from{opacity:0.3;transform:scale(0.3)} to{opacity:0;transform:scale(2.5)} }
+
+.splash-content { position:relative; z-index:2; text-align:center; padding:20px; max-width:700px; width:100%; }
+
+/* 漫畫封面標題 */
+.splash-eyebrow { font-size:13px; letter-spacing:6px; color:rgba(255,220,80,0.7); margin-bottom:10px; text-transform:uppercase; }
+.splash-title-wrap { margin-bottom:6px; position:relative; display:inline-block; }
+.splash-title-main {
+  font-size:clamp(36px,7vw,80px); font-weight:900; color:#fff; display:block;
+  letter-spacing:2px; line-height:1;
+  text-shadow: 4px 4px 0 #e8161c, 8px 8px 0 rgba(232,22,28,0.3);
+  font-style:italic;
+}
+.splash-title-main em { color:#ffdd44; font-style:normal; text-shadow:4px 4px 0 #b8860b, 8px 8px 0 rgba(184,134,11,0.3); }
+.splash-title-tw {
+  font-size:clamp(52px,10vw,110px); font-weight:900; color:#ffdd44; display:block;
+  letter-spacing:4px; line-height:1; margin-top:4px;
+  text-shadow: 5px 5px 0 #e8161c, -2px -2px 0 #111, 10px 10px 0 rgba(232,22,28,0.2);
+}
+.splash-tagline { font-size:14px; letter-spacing:4px; color:rgba(255,220,120,0.7); margin:12px 0 28px; }
+
+/* 設定卡 */
+.splash-setup {
+  background:rgba(255,255,255,0.06); border:2px solid rgba(255,220,80,0.3);
+  border-radius:16px; padding:24px 28px; backdrop-filter:blur(10px);
+  max-width:440px; margin:0 auto;
+}
+.splash-label { font-size:13px; letter-spacing:2px; color:rgba(255,220,80,0.7); margin-bottom:10px; }
+.count-row { display:flex; gap:8px; justify-content:center; margin-bottom:18px; }
+.count-btn { width:46px; height:46px; border-radius:50%; background:rgba(255,255,255,0.08);
+  border:2px solid rgba(255,220,80,0.3); color:rgba(255,220,80,0.5); font-size:18px; font-weight:900;
+  cursor:pointer; transition:all 0.18s; }
+.count-btn.sel { background:rgba(255,220,80,0.2); border-color:#ffdd44; color:#ffdd44;
+  box-shadow:0 0 12px rgba(255,220,80,0.3); }
+.player-inputs { display:flex; flex-direction:column; gap:8px; margin-bottom:20px; }
+.player-row { display:flex; align-items:center; gap:10px; }
+.p-dot { width:11px; height:11px; border-radius:50%; flex-shrink:0; }
+.p-input { flex:1; padding:9px 13px; background:rgba(255,255,255,0.08);
+  border:2px solid rgba(255,220,80,0.25); border-radius:8px;
+  font-family:inherit; font-size:14px; color:#fff; outline:none; }
+.p-input:focus { border-color:rgba(255,220,80,0.6); }
+.p-input::placeholder { color:rgba(255,255,255,0.3); }
+.start-btn {
+  width:100%; padding:14px; font-size:18px; font-weight:900; letter-spacing:3px;
+  border:3px solid #ffdd44; border-radius:10px; cursor:pointer;
+  background:linear-gradient(135deg,rgba(255,220,80,0.25),rgba(232,22,28,0.3));
+  color:#ffdd44; box-shadow:0 0 20px rgba(255,220,80,0.2);
+  transition:all 0.2s;
+}
+.start-btn:hover { box-shadow:0 0 36px rgba(255,220,80,0.4); transform:translateY(-2px); }
+.start-btn:active { transform:translateY(1px); }
+
+/* 哆啦A夢時光機SVG裝飾 */
+.splash-deco { position:absolute; pointer-events:none; }
+.splash-deco-tl { top:5%; left:3%; opacity:0.15; animation:deco-float 4s ease-in-out infinite; }
+.splash-deco-br { bottom:8%; right:4%; opacity:0.12; animation:deco-float 5s ease-in-out infinite reverse; }
+@keyframes deco-float { 0%,100%{transform:translateY(0) rotate(0deg)} 50%{transform:translateY(-15px) rotate(5deg)} }
+
+/* ── 主遊戲 ── */
+.title-bar { display:flex; align-items:flex-end; justify-content:space-between;
+  margin-bottom:10px; padding-bottom:8px; border-bottom:4px solid #111; position:relative; }
+.title-bar::after { content:''; position:absolute; bottom:-8px; left:0; right:0; height:3px; background:#e8161c; }
+.title-main { font-size:clamp(26px,3.5vw,44px); font-weight:900; color:#111; letter-spacing:1px;
+  text-shadow:3px 3px 0 rgba(232,22,28,0.15); font-style:italic; }
+.title-main em { color:#e8161c; font-style:normal; }
+.title-tagline { font-size:13px; letter-spacing:3px; color:#888; margin-top:3px; }
+.title-sfx { font-size:clamp(20px,3vw,36px); font-weight:900; color:#e8161c; transform:rotate(-6deg);
+  text-shadow:2px 2px 0 #111; letter-spacing:2px; display:inline-block; animation:sfx-w 2s ease-in-out infinite; }
+@keyframes sfx-w { 0%,100%{transform:rotate(-6deg) scale(1)} 50%{transform:rotate(-4deg) scale(1.06)} }
+
+/* 計分板 */
+.scoreboard { display:flex; gap:6px; margin-bottom:10px; flex-wrap:nowrap; overflow-x:auto; }
+.score-card { flex:1; min-width:100px; background:white; border:3px solid #111; padding:8px 12px;
+  box-shadow:4px 4px 0 #111; transition:transform 0.2s,box-shadow 0.2s,border-color 0.2s; white-space:nowrap;
+  clip-path:polygon(0 0,calc(100% - 10px) 0,100% 10px,100% 100%,10px 100%,0 calc(100% - 10px)); }
+.score-card.active { transform:translateY(-5px); box-shadow:4px 9px 0 #111; border-width:4px; }
+.score-name { font-size:15px; font-weight:900; color:#111; letter-spacing:1px; margin-bottom:2px; }
+.score-pts  { font-size:30px; font-weight:900; color:#111; line-height:1; }
+.score-lbl  { font-size:10px; color:#aaa; letter-spacing:1px; }
+/* 活躍玩家用金色邊框，不用紅底 */
+.score-card.active { border-color:#e8a000; box-shadow:4px 9px 0 #e8a000; }
+.score-card.active .score-name { color:#e8a000; }
+
+/* Turn Banner */
+.turn-banner { display:flex; align-items:center; justify-content:space-between;
+  background:#111; color:white; padding:8px 16px; margin-bottom:10px;
+  border-left:6px solid #e8161c; position:relative; overflow:hidden; }
+.turn-banner::before { content:'▶▶'; position:absolute; right:100px; font-size:10px; opacity:0.15; letter-spacing:6px; }
+.turn-who   { font-size:17px; font-weight:900; letter-spacing:2px; }
+.turn-phase { font-size:13px; color:rgba(255,255,255,0.6); letter-spacing:1px; }
+
+/* 三欄 */
+.cols-area { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-bottom:10px;
+  transition:grid-template-columns 0.4s cubic-bezier(0.4,0,0.2,1); }
+.cols-area.exp0 { grid-template-columns:3fr 0.7fr 0.7fr; }
+.cols-area.exp1 { grid-template-columns:0.7fr 3fr 0.7fr; }
+.cols-area.exp2 { grid-template-columns:0.7fr 0.7fr 3fr; }
+.col { background:white; border:3px solid #111; box-shadow:5px 5px 0 #111;
+  display:flex; flex-direction:column; transition:all 0.4s cubic-bezier(0.4,0,0.2,1); cursor:default; }
+.col.selectable { cursor:pointer; border-color:#e8161c; box-shadow:5px 5px 0 #e8161c; animation:cpulse 0.8s ease infinite alternate; }
+@keyframes cpulse { from{box-shadow:5px 5px 0 #e8161c;transform:translate(0,0)} to{box-shadow:7px 7px 0 #e8161c;transform:translate(-1px,-1px)} }
+.col.selectable:hover { background:#fff8f8; }
+.col.expanded { border-color:#e8161c; box-shadow:6px 6px 0 #e8161c; cursor:default; }
+.col.shrunk   { opacity:0.35; pointer-events:none; }
+.col-header { background:#111; color:white; padding:10px 12px; position:relative; overflow:hidden; flex-shrink:0; }
+.col-header::after { content:''; position:absolute; top:0; right:0; border-left:18px solid transparent; border-top:38px solid #e8161c; }
+.col-era   { font-size:clamp(13px,1.4vw,16px); font-weight:900; letter-spacing:1px; line-height:1.2; }
+.col-years { font-size:11px; color:#aaa; margin-top:2px; letter-spacing:1px; }
+.col-count { position:absolute; top:8px; right:8px; width:24px; height:24px; border-radius:50%;
+  background:#e8161c; color:white; border:2px solid white; font-size:11px; font-weight:900;
+  display:flex; align-items:center; justify-content:center; }
+.col-cards { padding:8px 6px; flex:1; overflow-y:auto; max-height:240px; display:flex; flex-direction:column; gap:4px; }
+.col.expanded .col-cards { max-height:300px; }
+.ev-card { background:white; border:2px solid #111; padding:7px 9px; display:flex; align-items:center;
+  justify-content:space-between; gap:6px; box-shadow:2px 2px 0 #ddd; position:relative; }
+.ev-card::before { content:''; position:absolute; left:0; top:0; bottom:0; width:4px; }
+.ev-card.taiwan::before   { background:#e8161c; }
+.ev-card.world::before    { background:#0055cc; }
+.ev-card.bonus-tw::before { background:#e8a000; }
+.ev-name { font-size:clamp(11px,1.2vw,14px); font-weight:700; color:#111; line-height:1.3; flex:1; }
+.stamp { min-width:44px; height:26px; border:2px solid #e8161c; border-radius:3px;
+  display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:900; color:#e8161c;
+  transform:rotate(-3deg); opacity:0; flex-shrink:0; background:rgba(232,22,28,0.04); }
+.stamp.show { opacity:1; animation:stamp-slam 0.5s cubic-bezier(0.22,1,0.36,1) forwards; }
+@keyframes stamp-slam { 0%{transform:rotate(-3deg) scale(3);opacity:0} 65%{transform:rotate(-3deg) scale(0.88);opacity:1} 100%{transform:rotate(-3deg) scale(1);opacity:1} }
+.ins-btn { width:100%; padding:8px 0; cursor:pointer; background:rgba(232,22,28,0.05);
+  border:2px dashed rgba(232,22,28,0.35); border-radius:4px; font-size:14px; font-weight:700;
+  color:rgba(232,22,28,0.5); letter-spacing:2px; transition:all 0.18s; text-align:center; }
+.ins-btn:hover { background:rgba(232,22,28,0.14); border-color:#e8161c; color:#e8161c; transform:scaleY(1.2); }
+.col-empty { text-align:center; color:#ccc; font-size:13px; padding:18px 0; font-style:italic; }
+
+/* 底部操作 */
+.action-area { display:flex; align-items:center; justify-content:center; gap:20px; flex-wrap:wrap; padding:6px 0; }
+.deck-wrap { text-align:center; }
+.deck-btn { width:100px; height:100px; border-radius:50%; border:4px solid #111; cursor:pointer;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  font-weight:900; font-size:17px; letter-spacing:1px; transition:all 0.18s; position:relative; overflow:hidden;
+  box-shadow:5px 5px 0 #111; }
+.deck-btn::before { content:''; position:absolute; inset:6px; border-radius:50%; border:2px dashed rgba(255,255,255,0.3); }
+.deck-draw { background:#111; color:white; }
+.deck-draw:hover  { transform:translate(-2px,-2px); box-shadow:7px 7px 0 #111; }
+.deck-draw:active { transform:translate(2px,2px); box-shadow:2px 2px 0 #111; }
+.deck-draw.disabled { opacity:0.3; cursor:not-allowed; pointer-events:none; }
+.deck-bonus { background:white; color:#b8860b; border-color:#b8860b; box-shadow:5px 5px 0 #b8860b; }
+.deck-bonus:hover  { transform:translate(-2px,-2px); box-shadow:7px 7px 0 #b8860b; }
+.deck-bonus:active { transform:translate(2px,2px); box-shadow:2px 2px 0 #b8860b; }
+.deck-bonus.locked { background:#eee; color:#bbb; border-color:#bbb; box-shadow:5px 5px 0 #bbb; cursor:not-allowed; }
+.deck-bonus.locked:hover { transform:none; }
+.deck-sub   { font-size:10px; letter-spacing:2px; opacity:0.6; margin-top:2px; }
+.deck-count { font-size:13px; font-weight:900; margin-top:6px; color:#555; letter-spacing:1px; }
+.deck-bonus.locked .deck-count { color:#bbb; }
+.lock-hint  { font-size:10px; color:#aaa; margin-top:2px; line-height:1.4; max-width:110px; }
+
+.cur-card-area { display:flex; flex-direction:column; align-items:center; gap:8px; min-width:150px; }
+.cur-card { width:145px; background:white; border:3px solid #111; box-shadow:5px 5px 0 #111;
+  padding:14px 12px; text-align:center; position:relative; overflow:hidden; }
+.cur-card::before { content:''; position:absolute; top:0; left:0; right:0; height:5px; }
+.cur-card.taiwan::before   { background:#e8161c; }
+.cur-card.world::before    { background:#0055cc; }
+.cur-card.bonus-tw::before { background:#e8a000; }
+.cur-card-type  { font-size:10px; letter-spacing:2px; color:#aaa; margin-bottom:8px; }
+.cur-card-event { font-size:17px; font-weight:900; color:#111; line-height:1.3; margin-bottom:6px; }
+.cur-card-hint  { font-size:12px; color:#888; line-height:1.4; }
+.cur-card-yr    { margin-top:10px; padding:2px 12px; border:2px solid #ddd; border-radius:3px;
+  display:inline-block; font-size:11px; color:#ccc; letter-spacing:2px; }
+.cur-placeholder { width:145px; height:95px; border:2px dashed #ddd; border-radius:4px;
+  display:flex; align-items:center; justify-content:center; font-size:12px; color:#ccc; letter-spacing:2px; }
+.status-msg { font-size:14px; font-weight:700; color:#555; letter-spacing:1px; text-align:center; max-width:150px; line-height:1.5; }
+.retry-badge { position:absolute; top:-10px; right:-10px; z-index:5; background:#ffcc00; border:3px solid #111;
+  border-radius:50%; width:52px; height:52px; display:flex; align-items:center; justify-content:center;
+  font-size:10px; font-weight:900; color:#111; text-align:center; line-height:1.2; transform:rotate(12deg);
+  box-shadow:3px 3px 0 #111; animation:bb 0.6s ease infinite alternate; }
+@keyframes bb { from{transform:rotate(12deg) scale(1)} to{transform:rotate(12deg) scale(1.12)} }
+
+/* ── 特效 ── */
+.fx-overlay { position:fixed; inset:0; z-index:500; pointer-events:none; display:flex; align-items:center; justify-content:center; }
+.fx-wrong { opacity:0; transition:opacity 0.15s; }
+.fx-wrong.show { opacity:1; pointer-events:all; }
+.fx-wrong-bg { position:absolute; inset:0; background:#fff; }
+.fx-wrong-lines { position:absolute; inset:0; overflow:hidden; }
+.fx-wrong-lines svg { width:100%; height:100%; }
+.fx-wrong-shake { animation:wrong-shake 0.5s ease; }
+@keyframes wrong-shake {
+  0%{transform:translate(0,0) rotate(0)} 15%{transform:translate(-12px,8px) rotate(-2deg)}
+  30%{transform:translate(10px,-6px) rotate(1.5deg)} 45%{transform:translate(-8px,10px) rotate(-1deg)}
+  60%{transform:translate(6px,-8px) rotate(2deg)} 75%{transform:translate(-5px,5px) rotate(-0.5deg)}
+  100%{transform:translate(0,0) rotate(0)}
+}
+.fx-wrong-text { position:relative; z-index:2; text-align:center;
+  animation:wrong-text-in 0.3s cubic-bezier(0.22,1,0.36,1); }
+@keyframes wrong-text-in { from{transform:translateX(-120%) rotate(-8deg) scale(0.7);opacity:0} to{transform:translateX(0) rotate(-3deg) scale(1);opacity:1} }
+.fx-wrong-main { font-size:clamp(52px,10vw,100px); font-weight:900; color:#e8161c;
+  text-shadow:5px 5px 0 #111,-3px -3px 0 #111; letter-spacing:2px; display:block; transform:rotate(-3deg); line-height:1; }
+.fx-wrong-sub  { font-size:clamp(22px,4vw,40px); font-weight:900; color:#111;
+  text-shadow:3px 3px 0 rgba(232,22,28,0.3); letter-spacing:2px; display:block; transform:rotate(-2deg); margin-top:8px; }
+.fx-col-ok { opacity:0; transition:opacity 0.15s; }
+.fx-col-ok.show { opacity:1; }
+.fx-col-ok-text { position:relative; z-index:2; text-align:center; animation:col-ok-in 0.35s cubic-bezier(0.22,1,0.36,1); }
+@keyframes col-ok-in { from{transform:translateY(30px) scale(0.6);opacity:0} to{transform:translateY(0) scale(1);opacity:1} }
+.fx-col-ok-main { font-size:clamp(48px,9vw,88px); font-weight:900; color:#22aa44; text-shadow:4px 4px 0 #111; letter-spacing:2px; display:block; }
+.fx-seq-ok { opacity:0; transition:opacity 0.15s; }
+.fx-seq-ok.show { opacity:1; }
+.fx-seq-ok-text { position:relative; z-index:2; text-align:center; animation:seq-ok-in 0.4s cubic-bezier(0.22,1,0.36,1); }
+@keyframes seq-ok-in { from{transform:translateY(60px) scale(0.4) rotate(5deg);opacity:0} to{transform:translateY(0) scale(1) rotate(0deg);opacity:1} }
+.fx-seq-ok-main { font-size:clamp(52px,10vw,96px); font-weight:900; color:#ffcc00;
+  text-shadow:5px 5px 0 #e8161c,-3px -3px 0 #111; letter-spacing:2px; display:block; line-height:1; }
+.fx-seq-ok-pts  { font-size:clamp(32px,6vw,60px); font-weight:900; color:white; text-shadow:4px 4px 0 #111; display:block; margin-top:8px; }
+.confetti-wrap  { position:absolute; inset:0; pointer-events:none; overflow:hidden; }
+.confetti { position:absolute; width:12px; height:12px; border-radius:2px; animation:confetti-fall 1.8s ease-out forwards; }
+@keyframes confetti-fall { 0%{transform:translateY(-20px) rotate(0deg);opacity:1} 100%{transform:translateY(110vh) rotate(720deg);opacity:0} }
+
+/* 街機得分飛出 */
+.arcade-pop {
+  position:fixed; z-index:600; pointer-events:none;
+  font-size:clamp(48px,8vw,90px); font-weight:900;
+  color:#ffdd44;
+  text-shadow: 4px 4px 0 #e8161c, -2px -2px 0 #111, 0 0 30px rgba(255,220,80,0.8);
+  animation:arcade-fly 1.6s cubic-bezier(0.22,1,0.36,1) forwards;
+  letter-spacing:2px;
+}
+@keyframes arcade-fly {
+  0%   { transform:translateX(-50%) translateY(0) scale(0.5); opacity:1; }
+  40%  { transform:translateX(-50%) translateY(-60px) scale(1.3); opacity:1; }
+  100% { transform:translateX(-50%) translateY(-180px) scale(1.6); opacity:0; }
+}
+
+/* 彈窗 */
+.modal-bg { position:fixed; inset:0; z-index:300; background:rgba(0,0,0,0.75);
+  display:flex; align-items:center; justify-content:center; opacity:0; pointer-events:none; transition:opacity 0.25s; }
+.modal-bg.show { opacity:1; pointer-events:all; }
+.modal-box { background:white; border:4px solid #111; box-shadow:8px 8px 0 #111;
+  padding:28px 34px; max-width:400px; width:92%; text-align:center; position:relative;
+  animation:mpop 0.35s cubic-bezier(0.22,1,0.36,1); }
+@keyframes mpop { from{transform:scale(0.6) rotate(-3deg);opacity:0} to{transform:scale(1) rotate(0);opacity:1} }
+.modal-box::before { content:''; position:absolute; top:0; left:0; right:0; height:6px;
+  background:repeating-linear-gradient(90deg,#e8161c 0,#e8161c 20px,#111 20px,#111 40px); }
+.modal-sfx   { font-size:36px; font-weight:900; color:#e8161c; text-shadow:2px 2px 0 #111; margin-bottom:8px; display:inline-block; transform:rotate(-2deg); }
+.modal-title { font-size:20px; font-weight:900; color:#111; margin-bottom:10px; letter-spacing:1px; }
+.modal-body  { font-size:14px; color:#444; line-height:1.9; margin-bottom:20px; background:#f8f8f8; padding:12px 14px; border-left:4px solid #e8161c; text-align:left; }
+.modal-body strong { color:#e8161c; }
+.modal-btn { padding:11px 32px; background:#111; color:white; border:3px solid #111; font-size:15px; font-weight:900; cursor:pointer; letter-spacing:2px; box-shadow:4px 4px 0 #555; transition:all 0.15s; }
+.modal-btn:hover  { transform:translate(-2px,-2px); box-shadow:6px 6px 0 #555; }
+.modal-btn:active { transform:translate(2px,2px); box-shadow:1px 1px 0 #555; }
+
+/* ── 結算畫面 ── */
+#screen-end { position:fixed; inset:0; z-index:150; background:#0a0614;
+  display:flex; align-items:center; justify-content:center; opacity:0; pointer-events:none; transition:opacity 0.5s;
+  overflow:hidden; }
+#screen-end.show { opacity:1; pointer-events:all; }
+.end-stars { position:absolute; inset:0; pointer-events:none; }
+.end-box { position:relative; z-index:2; text-align:center; padding:20px; width:100%; max-width:700px; }
+.end-lbl { font-size:13px; letter-spacing:5px; color:rgba(255,220,80,0.5); margin-bottom:6px; }
+.end-winner { font-size:clamp(32px,7vw,64px); font-weight:900; color:#ffdd44;
+  text-shadow:4px 4px 0 #e8161c,-2px -2px 0 #111; margin-bottom:28px; letter-spacing:2px; }
+
+/* 頒獎台 */
+.podium-wrap { display:flex; align-items:flex-end; justify-content:center; gap:0; margin-bottom:28px; }
+.podium-slot { display:flex; flex-direction:column; align-items:center; }
+.podium-crown { font-size:36px; margin-bottom:4px; animation:crown-bounce 1s ease-in-out infinite; }
+@keyframes crown-bounce { 0%,100%{transform:translateY(0) rotate(-5deg)} 50%{transform:translateY(-10px) rotate(5deg)} }
+.podium-name { font-size:13px; font-weight:700; color:rgba(255,255,255,0.8); margin-bottom:4px; letter-spacing:1px; }
+.podium-pts  { font-size:22px; font-weight:900; color:#ffdd44; margin-bottom:6px; text-shadow:2px 2px 0 #111; }
+.podium-block { display:flex; align-items:center; justify-content:center;
+  font-size:28px; font-weight:900; color:white; letter-spacing:2px;
+  border:3px solid rgba(255,255,255,0.3); border-bottom:none; position:relative; }
+.podium-block::after { content:''; position:absolute; inset:0; background:rgba(0,0,0,0.2); }
+.podium-1st .podium-block { width:110px; height:100px; background:linear-gradient(135deg,#c8a000,#e8c840,#c8a000); border-color:rgba(255,220,80,0.5); font-size:32px; }
+.podium-2nd .podium-block { width:90px;  height:72px;  background:linear-gradient(135deg,#888,#bbb,#888); border-color:rgba(200,200,200,0.4); }
+.podium-3rd .podium-block { width:90px;  height:54px;  background:linear-gradient(135deg,#a06030,#c88060,#a06030); border-color:rgba(180,120,80,0.4); }
+.podium-num { position:relative; z-index:1; }
+
+.end-others { display:flex; gap:10px; flex-wrap:wrap; justify-content:center; margin-bottom:28px; }
+.end-sc { background:rgba(255,255,255,0.08); border:2px solid rgba(255,255,255,0.15); border-radius:10px; padding:10px 16px; min-width:80px; }
+.end-sc-n { font-size:11px; color:rgba(255,255,255,0.5); margin-bottom:3px; }
+.end-sc-v { font-size:24px; font-weight:900; color:rgba(255,255,255,0.7); }
+.end-sc-l { font-size:9px; color:rgba(255,255,255,0.3); }
+.restart-btn { padding:14px 40px; background:transparent; color:#ffdd44; border:3px solid #ffdd44;
+  font-size:16px; font-weight:900; cursor:pointer; letter-spacing:3px;
+  box-shadow:0 0 20px rgba(255,220,80,0.2); transition:all 0.2s; border-radius:4px; }
+.restart-btn:hover { background:rgba(255,220,80,0.15); box-shadow:0 0 36px rgba(255,220,80,0.4); transform:translateY(-2px); }
+
+.c0{background:#e85050}.c1{background:#2d9e60}.c2{background:#3366cc}.c3{background:#e8a000}.c4{background:#9933cc}.c5{background:#cc3388}
+
+/* ── 規則頁 ── */
+#screen-rules {
+  position:fixed; inset:0; z-index:180;
+  background:#111; display:flex; align-items:flex-start; justify-content:center;
+  overflow-y:auto; padding:16px 16px 32px;
+  -webkit-overflow-scrolling:touch;
+}
+#screen-rules.gone { display:none; }
+.rules-wrap {
+  max-width:720px; width:100%;
+  background:white; border:4px solid #111;
+  box-shadow:10px 10px 0 #e8161c; overflow:hidden;
+}
+.rules-wrap::before {
+  content:''; display:block; height:8px;
+  background:repeating-linear-gradient(90deg,#e8161c 0,#e8161c 24px,#111 24px,#111 48px);
+}
+.rules-header {
+  background:#111; color:white; padding:16px 24px;
+  display:flex; align-items:center; justify-content:space-between;
+  border-bottom:4px solid #e8161c;
+}
+.rules-title { font-size:clamp(18px,3vw,26px); font-weight:900; letter-spacing:2px; }
+.rules-title em { color:#e8161c; font-style:normal; }
+.rules-tagline { font-size:11px; color:rgba(255,255,255,0.5); letter-spacing:3px; margin-top:3px; }
+.rules-badge {
+  background:#e8161c; color:white; font-size:11px; font-weight:900;
+  letter-spacing:2px; padding:5px 12px; border:2px solid white; transform:rotate(3deg);
+}
+.rules-body { padding:0; }
+.rule-block {
+  display:flex; align-items:stretch; border-bottom:3px solid #111;
+  min-height:90px; position:relative; overflow:hidden;
+}
+.rule-block:last-child { border-bottom:none; }
+.rule-num {
+  width:70px; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center;
+  font-size:42px; font-weight:900; color:white;
+  border-right:3px solid #111;
+}
+.rule-block:nth-child(1) .rule-num { background:#e8161c; }
+.rule-block:nth-child(2) .rule-num { background:#111; }
+.rule-block:nth-child(3) .rule-num { background:#22aa44; }
+.rule-block:nth-child(4) .rule-num { background:#0055cc; }
+.rule-block:nth-child(5) .rule-num { background:#b8860b; }
+.rule-content { flex:1; padding:16px 20px; display:flex; gap:14px; align-items:flex-start; }
+.rule-icon { font-size:34px; flex-shrink:0; margin-top:2px; }
+.rule-text { flex:1; }
+.rule-title {
+  font-size:clamp(15px,2.2vw,20px); font-weight:900; color:#111;
+  margin-bottom:8px; line-height:1.2;
+  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+}
+.rule-title .sfx {
+  font-size:13px; font-weight:900; color:#e8161c;
+  transform:rotate(-4deg); display:inline-block;
+  text-shadow:1px 1px 0 #111; letter-spacing:1px;
+}
+.rule-desc { font-size:clamp(12px,1.6vw,14px); color:#333; line-height:1.9; }
+.rule-desc strong { color:#e8161c; font-weight:900; }
+.rule-desc .ok  { color:#22aa44; font-weight:900; }
+.rule-desc .bad { color:#e8161c; font-weight:900; }
+.tag {
+  display:inline-block; padding:2px 8px; font-size:11px; font-weight:900;
+  color:white; border:2px solid #111; letter-spacing:1px;
+  vertical-align:middle; margin:0 2px;
+}
+.tag-red  { background:#e8161c; }
+.tag-gold { background:#b8860b; }
+.score-bar { display:flex; background:#111; border-top:3px solid #111; }
+.score-item { flex:1; padding:12px 8px; text-align:center; border-right:2px solid #333; }
+.score-item:last-child { border-right:none; }
+.s-icon  { font-size:20px; margin-bottom:3px; }
+.s-label { font-size:10px; color:rgba(255,255,255,0.5); letter-spacing:1px; margin-bottom:2px; }
+.s-val   { font-size:18px; font-weight:900; color:white; }
+.s-val em { color:#ffcc00; font-style:normal; }
+.rules-footer {
+  background:#fafaf5; padding:16px 24px;
+  display:flex; align-items:center; justify-content:space-between;
+  border-top:3px solid #111; gap:12px; flex-wrap:wrap;
+}
+.rules-note { font-size:11px; color:#aaa; letter-spacing:1px; line-height:1.6; }
+.begin-btn {
+  padding:14px 36px; background:#111; color:white; border:3px solid #111;
+  font-size:17px; font-weight:900; cursor:pointer; letter-spacing:3px;
+  box-shadow:5px 5px 0 #e8161c; transition:all 0.18s;
+}
+.begin-btn:hover  { transform:translate(-2px,-2px); box-shadow:7px 7px 0 #e8161c; }
+.begin-btn:active { transform:translate(2px,2px); box-shadow:2px 2px 0 #e8161c; }
+</style>
+</head>
+<body>
+
+<div class="speed-bg">
+  <svg viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+    <g stroke="#bbb" stroke-width="0.6" opacity="0.45">
+      <line x1="600" y1="400" x2="0" y2="0"/><line x1="600" y1="400" x2="150" y2="0"/>
+      <line x1="600" y1="400" x2="300" y2="0"/><line x1="600" y1="400" x2="450" y2="0"/>
+      <line x1="600" y1="400" x2="600" y2="0"/><line x1="600" y1="400" x2="750" y2="0"/>
+      <line x1="600" y1="400" x2="900" y2="0"/><line x1="600" y1="400" x2="1050" y2="0"/>
+      <line x1="600" y1="400" x2="1200" y2="0"/><line x1="600" y1="400" x2="0" y2="160"/>
+      <line x1="600" y1="400" x2="0" y2="320"/><line x1="600" y1="400" x2="0" y2="480"/>
+      <line x1="600" y1="400" x2="0" y2="640"/><line x1="600" y1="400" x2="0" y2="800"/>
+      <line x1="600" y1="400" x2="1200" y2="160"/><line x1="600" y1="400" x2="1200" y2="320"/>
+      <line x1="600" y1="400" x2="1200" y2="480"/><line x1="600" y1="400" x2="1200" y2="640"/>
+      <line x1="600" y1="400" x2="1200" y2="800"/><line x1="600" y1="400" x2="300" y2="800"/>
+      <line x1="600" y1="400" x2="600" y2="800"/><line x1="600" y1="400" x2="900" y2="800"/>
+    </g>
+    <radialGradient id="vg" cx="50%" cy="50%" r="55%">
+      <stop offset="0%" stop-color="#fafaf5" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#e8e4d8" stop-opacity="0.7"/>
+    </radialGradient>
+    <rect width="1200" height="800" fill="url(#vg)"/>
+  </svg>
+</div>
+<div class="halftone"></div>
+
+<!-- ══ 起始畫面 ══ -->
+<div id="screen-splash">
+  <!-- 星星 -->
+  <div class="splash-stars">
+    <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+      <defs><radialGradient id="sg" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#fff" stop-opacity="1"/><stop offset="100%" stop-color="#fff" stop-opacity="0"/></radialGradient></defs>
+      <g opacity="0.8">
+        <circle cx="5%"  cy="8%"  r="1.5" fill="white"/><circle cx="15%" cy="3%"  r="1"   fill="white"/>
+        <circle cx="25%" cy="12%" r="2"   fill="white"/><circle cx="40%" cy="5%"  r="1"   fill="white"/>
+        <circle cx="55%" cy="9%"  r="1.5" fill="white"/><circle cx="70%" cy="4%"  r="1"   fill="white"/>
+        <circle cx="82%" cy="14%" r="2"   fill="white"/><circle cx="92%" cy="7%"  r="1.5" fill="white"/>
+        <circle cx="10%" cy="25%" r="1"   fill="white"/><circle cx="88%" cy="30%" r="1"   fill="white"/>
+        <circle cx="3%"  cy="50%" r="1.5" fill="white"/><circle cx="97%" cy="55%" r="1"   fill="white"/>
+        <circle cx="20%" cy="80%" r="1"   fill="white"/><circle cx="75%" cy="85%" r="1.5" fill="white"/>
+        <circle cx="50%" cy="92%" r="1"   fill="white"/><circle cx="35%" cy="70%" r="2"   fill="rgba(255,220,80,0.8)"/>
+        <circle cx="65%" cy="60%" r="1.5" fill="rgba(180,180,255,0.8)"/>
+      </g>
+    </svg>
+  </div>
+  <!-- 時光隧道 -->
+  <div class="tunnel-lines">
+    <svg viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+      <g stroke="rgba(120,80,220,0.4)" stroke-width="1" fill="none">
+        <ellipse cx="600" cy="400" rx="50"  ry="35"/>
+        <ellipse cx="600" cy="400" rx="120" ry="85"/>
+        <ellipse cx="600" cy="400" rx="210" ry="150"/>
+        <ellipse cx="600" cy="400" rx="330" ry="235"/>
+        <ellipse cx="600" cy="400" rx="480" ry="340"/>
+        <ellipse cx="600" cy="400" rx="660" ry="470"/>
+      </g>
+      <!-- 時光射線 -->
+      <g stroke="rgba(100,160,255,0.15)" stroke-width="1">
+        <line x1="600" y1="400" x2="0" y2="0"/><line x1="600" y1="400" x2="300" y2="0"/>
+        <line x1="600" y1="400" x2="600" y2="0"/><line x1="600" y1="400" x2="900" y2="0"/>
+        <line x1="600" y1="400" x2="1200" y2="0"/><line x1="600" y1="400" x2="0" y2="400"/>
+        <line x1="600" y1="400" x2="1200" y2="400"/><line x1="600" y1="400" x2="0" y2="800"/>
+        <line x1="600" y1="400" x2="600" y2="800"/><line x1="600" y1="400" x2="1200" y2="800"/>
+      </g>
+    </svg>
+  </div>
+
+  <!-- 左上裝飾：時鐘 -->
+  <div class="splash-deco splash-deco-tl">
+    <svg width="120" height="120" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="60" cy="60" r="50" stroke="#ffdd44" stroke-width="3" fill="none"/>
+      <circle cx="60" cy="60" r="44" stroke="#ffdd44" stroke-width="1" fill="none" opacity="0.4"/>
+      <line x1="60" y1="60" x2="60" y2="25" stroke="#ffdd44" stroke-width="3" stroke-linecap="round"/>
+      <line x1="60" y1="60" x2="85" y2="60" stroke="#ffdd44" stroke-width="2" stroke-linecap="round"/>
+      <circle cx="60" cy="60" r="4" fill="#ffdd44"/>
+      <text x="60" y="16" text-anchor="middle" fill="#ffdd44" font-size="10" opacity="0.6">12</text>
+      <text x="104" y="64" text-anchor="middle" fill="#ffdd44" font-size="10" opacity="0.6">3</text>
+      <text x="60" y="110" text-anchor="middle" fill="#ffdd44" font-size="10" opacity="0.6">6</text>
+      <text x="16" y="64" text-anchor="middle" fill="#ffdd44" font-size="10" opacity="0.6">9</text>
+    </svg>
+  </div>
+  <!-- 右下裝飾：齒輪 -->
+  <div class="splash-deco splash-deco-br">
+    <svg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="50" cy="50" r="28" stroke="#ffdd44" stroke-width="2.5" fill="none"/>
+      <circle cx="50" cy="50" r="12" stroke="#ffdd44" stroke-width="2" fill="none"/>
+      <line x1="50" y1="14" x2="50" y2="22" stroke="#ffdd44" stroke-width="4" stroke-linecap="round"/>
+      <line x1="50" y1="78" x2="50" y2="86" stroke="#ffdd44" stroke-width="4" stroke-linecap="round"/>
+      <line x1="14" y1="50" x2="22" y2="50" stroke="#ffdd44" stroke-width="4" stroke-linecap="round"/>
+      <line x1="78" y1="50" x2="86" y2="50" stroke="#ffdd44" stroke-width="4" stroke-linecap="round"/>
+      <line x1="24" y1="24" x2="30" y2="30" stroke="#ffdd44" stroke-width="3" stroke-linecap="round"/>
+      <line x1="70" y1="70" x2="76" y2="76" stroke="#ffdd44" stroke-width="3" stroke-linecap="round"/>
+      <line x1="76" y1="24" x2="70" y2="30" stroke="#ffdd44" stroke-width="3" stroke-linecap="round"/>
+      <line x1="30" y1="70" x2="24" y2="76" stroke="#ffdd44" stroke-width="3" stroke-linecap="round"/>
+    </svg>
+  </div>
+
+  <div class="splash-content">
+    <div class="splash-eyebrow">✦ 歷史時間線遊戲 ✦</div>
+    <div class="splash-title-wrap">
+      <span class="splash-title-main"><em>Once upon a</em> Time</span>
+      <span class="splash-title-tw">灣</span>
+    </div>
+    <div class="splash-tagline">每一張卡，都是一段過去</div>
+    <div class="splash-setup">
+      <div class="splash-label">玩家人數</div>
+      <div class="count-row">
+        <button class="count-btn" onclick="setCount(1)">1</button>
+        <button class="count-btn" onclick="setCount(2)">2</button>
+        <button class="count-btn sel" onclick="setCount(3)">3</button>
+        <button class="count-btn" onclick="setCount(4)">4</button>
+        <button class="count-btn" onclick="setCount(5)">5</button>
+        <button class="count-btn" onclick="setCount(6)">6</button>
+      </div>
+      <div class="player-inputs" id="player-inputs"></div>
+      <button class="start-btn" onclick="startGame()">✦ 穿越時空，出發！ ✦</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ 規則頁 ══ -->
+<div id="screen-rules" class="gone">
+  <div class="rules-wrap">
+
+    <div class="rules-header">
+      <div>
+        <div class="rules-title"><em>Once upon a</em> Time灣</div>
+        <div class="rules-tagline">穿越時空前，先看這裡！</div>
+      </div>
+      <div class="rules-badge">遊戲規則</div>
+    </div>
+
+    <div class="rules-body">
+
+      <div class="rule-block">
+        <div class="rule-num">1</div>
+        <div class="rule-content">
+          <div class="rule-icon">🃏</div>
+          <div class="rule-text">
+            <div class="rule-title">輪到你，選牌堆抽牌！<span class="sfx">ドロー！</span></div>
+            <div class="rule-desc">
+              <span class="tag tag-red">課本牌</span> 台灣歷史事件，放對欄位 <strong>+1分</strong><br>
+              <span class="tag tag-gold">機會牌</span> 沒上過課的有趣歷史，放對欄位 <strong>+5分</strong><br>
+              機會牌需等三個欄位<strong>各有3張</strong>才會解鎖！
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="rule-block">
+        <div class="rule-num">2</div>
+        <div class="rule-content">
+          <div class="rule-icon">🗂️</div>
+          <div class="rule-text">
+            <div class="rule-title">點欄位，猜是哪個時代！<span class="sfx">どこだ！？</span></div>
+            <div class="rule-desc">
+              <span class="ok">✔ 猜對</span> → 加欄位分，進入時序挑戰<br>
+              <span class="bad">✘ 猜錯</span> → 0分，牌丟回牌堆，<strong>換下一位</strong>重新抽牌<br>
+              同一張牌只有 <strong>2次機會</strong>，第2次猜錯直接公布答案
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="rule-block">
+        <div class="rule-num">3</div>
+        <div class="rule-content">
+          <div class="rule-icon">📅</div>
+          <div class="rule-text">
+            <div class="rule-title">插對時間位置，加更多分！<span class="sfx">正確！！</span></div>
+            <div class="rule-desc">
+              欄位確認後，欄位放大，選正確的插入位置！<br>
+              <span class="ok">✔ 插對</span> → 欄位裡<strong>已有N張</strong>，就加N分（第一張得0分）<br>
+              <span class="bad">✘ 插錯</span> → 0分，牌丟回牌堆，<strong>換下一位</strong>重新抽牌
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="rule-block">
+        <div class="rule-num">4</div>
+        <div class="rule-content">
+          <div class="rule-icon">⚡</div>
+          <div class="rule-text">
+            <div class="rule-title">猜錯怎麼辦？<span class="sfx">ドンマイ！</span></div>
+            <div class="rule-desc">
+              <strong>多人模式</strong>：猜錯的牌丟回牌堆，換下一位重新抽牌<br>
+              牌再次出現時顯示 <strong>「再來一次！」</strong>——第2次猜錯直接公布答案<br>
+              <strong>單人模式</strong>：猜錯直接公布答案，繼續抽下一張
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="rule-block">
+        <div class="rule-num">5</div>
+        <div class="rule-content">
+          <div class="rule-icon">🏆</div>
+          <div class="rule-text">
+            <div class="rule-title">牌堆用完，看結果！<span class="sfx">勝者！</span></div>
+            <div class="rule-desc">
+              課本牌與機會牌全部用完後遊戲結束<br>
+              <strong>多人</strong>：積分最高者獲勝！同分時共同勝出<br>
+              <strong>單人</strong>：依得分率獲得稱號——挑戰看看能不能成為時光機發明家！
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="score-bar">
+      <div class="score-item">
+        <div class="s-icon">🗂️</div>
+        <div class="s-label">課本牌欄位</div>
+        <div class="s-val"><em>+1</em> 分</div>
+      </div>
+      <div class="score-item">
+        <div class="s-icon">⭐</div>
+        <div class="s-label">機會牌欄位</div>
+        <div class="s-val"><em>+5</em> 分</div>
+      </div>
+      <div class="score-item">
+        <div class="s-icon">📅</div>
+        <div class="s-label">時序正確</div>
+        <div class="s-val">+<em>N</em> 分</div>
+      </div>
+      <div class="score-item">
+        <div class="s-icon">❌</div>
+        <div class="s-label">任何猜錯</div>
+        <div class="s-val"><em>0</em> 分</div>
+      </div>
+    </div>
+
+    <div class="rules-footer">
+      <div class="rules-note">N = 放入時，該欄位已有幾張牌　第一張放入時序得 0 分</div>
+      <button class="begin-btn" onclick="beginGame()">穿越時空，出發！▶▶</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══ 主遊戲 ══ -->
+<div class="wrap">
+  <div class="title-bar">
+    <div>
+      <div class="title-main"><em>Once upon a</em> Time灣</div>
+      <div class="title-tagline">每一張卡，都是一段過去</div>
+    </div>
+    <div class="title-sfx" id="title-sfx">歷史！</div>
+  </div>
+  <div class="scoreboard" id="scoreboard"></div>
+  <div class="turn-banner">
+    <div class="turn-who" id="turn-who">—</div>
+    <div class="turn-phase" id="turn-phase">請選擇抽牌</div>
+  </div>
+  <div class="cols-area" id="cols-area">
+    <div class="col" id="col0" onclick="colClick(0)">
+      <div class="col-header"><div class="col-era">日治時期</div><div class="col-years">1895 — 1945</div><div class="col-count" id="cnt0">0</div></div>
+      <div class="col-cards" id="cards0"><div class="col-empty">尚無事件</div></div>
+    </div>
+    <div class="col" id="col1" onclick="colClick(1)">
+      <div class="col-header"><div class="col-era">中華民國解嚴前</div><div class="col-years">1945 — 1987</div><div class="col-count" id="cnt1">0</div></div>
+      <div class="col-cards" id="cards1"><div class="col-empty">尚無事件</div></div>
+    </div>
+    <div class="col" id="col2" onclick="colClick(2)">
+      <div class="col-header"><div class="col-era">中華民國解嚴後</div><div class="col-years">1987 —</div><div class="col-count" id="cnt2">0</div></div>
+      <div class="col-cards" id="cards2"><div class="col-empty">尚無事件</div></div>
+    </div>
+  </div>
+  <div class="action-area">
+    <div class="deck-wrap">
+      <button class="deck-btn deck-draw" id="draw-btn" onclick="doDraw()">抽牌<span class="deck-sub">DRAW</span></button>
+      <div class="deck-count" id="draw-count">— 張</div>
+    </div>
+    <div class="cur-card-area">
+      <div id="cur-card-wrap"><div class="cur-placeholder">等待抽牌</div></div>
+      <div class="status-msg" id="status-msg">選擇左側牌堆開始</div>
+    </div>
+    <div class="deck-wrap">
+      <button class="deck-btn deck-bonus locked" id="bonus-btn" onclick="doBonus()">機會牌<span class="deck-sub">BONUS</span></button>
+      <div class="deck-count" id="bonus-count" style="color:#bbb">— 張</div>
+      <div class="lock-hint" id="lock-hint">各欄≥3張後解鎖</div>
+    </div>
+  </div>
+</div>
+
+<!-- 答錯特效 -->
+<div class="fx-overlay fx-wrong" id="fx-wrong">
+  <div class="fx-wrong-bg"></div>
+  <div class="fx-wrong-lines">
+    <svg viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+      <g stroke="#e8161c" stroke-width="2.5" opacity="0.2">
+        <line x1="600" y1="400" x2="0" y2="0"/><line x1="600" y1="400" x2="150" y2="0"/>
+        <line x1="600" y1="400" x2="300" y2="0"/><line x1="600" y1="400" x2="450" y2="0"/>
+        <line x1="600" y1="400" x2="600" y2="0"/><line x1="600" y1="400" x2="750" y2="0"/>
+        <line x1="600" y1="400" x2="900" y2="0"/><line x1="600" y1="400" x2="1050" y2="0"/>
+        <line x1="600" y1="400" x2="1200" y2="0"/><line x1="600" y1="400" x2="0" y2="200"/>
+        <line x1="600" y1="400" x2="0" y2="400"/><line x1="600" y1="400" x2="0" y2="600"/>
+        <line x1="600" y1="400" x2="0" y2="800"/><line x1="600" y1="400" x2="1200" y2="200"/>
+        <line x1="600" y1="400" x2="1200" y2="400"/><line x1="600" y1="400" x2="1200" y2="600"/>
+        <line x1="600" y1="400" x2="1200" y2="800"/><line x1="600" y1="400" x2="300" y2="800"/>
+        <line x1="600" y1="400" x2="600" y2="800"/><line x1="600" y1="400" x2="900" y2="800"/>
+      </g>
+      <line x1="-100" y1="320" x2="1400" y2="360" stroke="#e8161c" stroke-width="6" opacity="0.5"/>
+      <line x1="-100" y1="400" x2="1400" y2="400" stroke="#111"    stroke-width="10" opacity="0.6"/>
+      <line x1="-100" y1="460" x2="1400" y2="440" stroke="#e8161c" stroke-width="6" opacity="0.5"/>
+    </svg>
+  </div>
+  <div class="fx-wrong-text">
+    <span class="fx-wrong-main">答錯！！</span>
+    <span class="fx-wrong-sub" id="fx-wrong-sub">下面一位！</span>
+  </div>
+</div>
+
+<!-- 欄位答對 -->
+<div class="fx-overlay fx-col-ok" id="fx-col-ok">
+  <div class="fx-col-ok-text"><span class="fx-col-ok-main">正確！</span></div>
+</div>
+
+<!-- 時序答對 -->
+<div class="fx-overlay fx-seq-ok" id="fx-seq-ok">
+  <div class="confetti-wrap" id="confetti-wrap"></div>
+  <div class="fx-seq-ok-text">
+    <span class="fx-seq-ok-main">正確！！</span>
+    <span class="fx-seq-ok-pts" id="fx-seq-pts">+3分</span>
+  </div>
+</div>
+
+<!-- 解鎖彈窗 -->
+<div class="modal-bg" id="modal-unlock">
+  <div class="modal-box">
+    <div class="modal-sfx">UNLOCK！！</div>
+    <div class="modal-title">🔓 機會牌解鎖！</div>
+    <div class="modal-body">三個時期各累積 <strong>3張</strong>後，機會牌可以抽了！<br><br>⭐ 放對欄位：<strong>+5分</strong><br>⭐ 放對時序：額外加分<br><br>⚠️ 課本沒教過，靠推理與直覺！</div>
+    <button class="modal-btn" onclick="closeModal('modal-unlock')">了解！衝！</button>
+  </div>
+</div>
+
+<!-- 答案彈窗 -->
+<div class="modal-bg" id="modal-reveal">
+  <div class="modal-box">
+    <div class="modal-sfx" id="rev-sfx">公布！</div>
+    <div class="modal-title">正確答案</div>
+    <div class="modal-body" id="rev-body"></div>
+    <button class="modal-btn" onclick="closeReveal()">繼續 ▶</button>
+  </div>
+</div>
+
+<!-- ══ 結算畫面 ══ -->
+<div id="screen-end">
+  <div class="end-stars">
+    <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+      <g opacity="0.6">
+        <circle cx="5%"  cy="5%"  r="2" fill="white"/><circle cx="20%" cy="10%" r="1.5" fill="white"/>
+        <circle cx="40%" cy="3%"  r="1" fill="white"/> <circle cx="65%" cy="8%"  r="2"   fill="white"/>
+        <circle cx="85%" cy="4%"  r="1.5" fill="white"/><circle cx="95%" cy="15%" r="1"  fill="white"/>
+        <circle cx="8%"  cy="90%" r="1.5" fill="white"/><circle cx="30%" cy="95%" r="1"  fill="white"/>
+        <circle cx="60%" cy="92%" r="2"   fill="white"/><circle cx="88%" cy="88%" r="1.5" fill="white"/>
+        <circle cx="15%" cy="50%" r="1"   fill="rgba(255,220,80,0.8)"/>
+        <circle cx="90%" cy="45%" r="1.5" fill="rgba(180,180,255,0.8)"/>
+      </g>
+    </svg>
+  </div>
+  <div class="end-box">
+    <div class="end-lbl">🏆 獲勝者</div>
+    <div class="end-winner" id="end-winner">—</div>
+    <div class="podium-wrap" id="podium-wrap"></div>
+    <div class="end-others" id="end-others"></div>
+    <button class="restart-btn" onclick="location.reload()">再來一次！</button>
+  </div>
+</div>
+
+<script>
+// ══ Web Audio ══
+var AC=null;
+function getAC(){ if(!AC) try{AC=new(window.AudioContext||window.webkitAudioContext)();}catch(e){} return AC; }
+function playTone(freq,type,dur,vol,delay){
+  var ac=getAC(); if(!ac) return;
+  try{
+    var o=ac.createOscillator(),g=ac.createGain();
+    o.connect(g); g.connect(ac.destination);
+    o.type=type||'sine'; o.frequency.value=freq||440;
+    g.gain.setValueAtTime(vol||0.3,ac.currentTime+(delay||0));
+    g.gain.exponentialRampToValueAtTime(0.001,ac.currentTime+(delay||0)+(dur||0.3));
+    o.start(ac.currentTime+(delay||0)); o.stop(ac.currentTime+(delay||0)+(dur||0.3)+0.05);
+  }catch(e){}
+}
+function sfxWrong(){ playTone(180,'sawtooth',0.6,0.4,0); playTone(120,'sawtooth',0.8,0.3,0.1); playTone(80,'square',1.0,0.25,0.25); }
+function sfxColOk(){ playTone(520,'sine',0.18,0.3,0); playTone(660,'sine',0.22,0.3,0.12); playTone(880,'sine',0.18,0.2,0.26); }
+function sfxSeqOk(){ [523,659,784,1047,1319].forEach(function(f,i){playTone(f,'sine',0.18,0.35,i*0.08);}); playTone(1568,'sine',0.3,0.4,0.5); playTone(2093,'sine',0.25,0.3,0.65); }
+function sfxStamp(){ playTone(300,'square',0.12,0.3,0); playTone(200,'square',0.15,0.25,0.06); }
+function sfxDraw(){
+  var ac=getAC(); if(!ac) return;
+  try{
+    // 白噪音短促刷卡聲
+    var bufSize=ac.sampleRate*0.18;
+    var buf=ac.createBuffer(1,bufSize,ac.sampleRate);
+    var data=buf.getChannelData(0);
+    for(var i=0;i<bufSize;i++) data[i]=(Math.random()*2-1);
+    var src=ac.createBufferSource();
+    src.buffer=buf;
+    // 帶通濾波，讓聲音有「紙感」
+    var bp=ac.createBiquadFilter();
+    bp.type='bandpass'; bp.frequency.value=3800; bp.Q.value=0.8;
+    var g=ac.createGain();
+    g.gain.setValueAtTime(0.55,ac.currentTime);
+    g.gain.linearRampToValueAtTime(0.3,ac.currentTime+0.04);
+    g.gain.exponentialRampToValueAtTime(0.001,ac.currentTime+0.18);
+    src.connect(bp); bp.connect(g); g.connect(ac.destination);
+    src.start(); src.stop(ac.currentTime+0.19);
+  }catch(e){}
+}
+function sfxUnlock(){ [440,550,660,880,1100].forEach(function(f,i){playTone(f,'sine',0.2,0.3,i*0.1);}); }
+function sfxWin(){
+  [523,659,784,1047,1319,1568,2093].forEach(function(f,i){playTone(f,'sine',0.3,0.4,i*0.1);});
+  setTimeout(function(){ [784,1047,1319,1047,784,1047,1319,1568].forEach(function(f,i){playTone(f,'sine',0.25,0.35,i*0.12);}); },900);
+}
+
+// ══ 牌庫 ══
+var BOOK=[
+  {id:1, type:'taiwan',cat:'book',col:0,event:'臺灣民主國',        year:1895,hint:'乙未戰爭後短暫建立的政權'},
+  {id:2, type:'taiwan',cat:'book',col:0,event:'設自來水系統',      year:1896,hint:'現代化基礎建設的開端'},
+  {id:3, type:'taiwan',cat:'book',col:0,event:'橋仔頭糖廠',        year:1901,hint:'第一座現代化製糖廠'},
+  {id:4, type:'taiwan',cat:'book',col:0,event:'第一次人口普查',    year:1905,hint:'現代化行政管理的開始'},
+  {id:5, type:'taiwan',cat:'book',col:0,event:'縱貫鐵路完工',      year:1908,hint:'基隆到高雄全線通車'},
+  {id:6, type:'taiwan',cat:'book',col:0,event:'苗栗事件',          year:1913,hint:'羅福星領導的武裝起義'},
+  {id:7, type:'taiwan',cat:'book',col:0,event:'西來庵事件',        year:1915,hint:'余清芳領導的武裝起義'},
+  {id:8, type:'taiwan',cat:'book',col:0,event:'臺灣文化協會',      year:1921,hint:'蔣渭水推動的文化啟蒙運動'},
+  {id:9, type:'taiwan',cat:'book',col:0,event:'臺灣議會請願運動',  year:1921,hint:'爭取自治的民主運動'},
+  {id:10,type:'taiwan',cat:'book',col:0,event:'蓬萊米栽培成功',    year:1926,hint:'磯永吉研發的農業突破'},
+  {id:11,type:'taiwan',cat:'book',col:0,event:'臺北帝國大學',      year:1928,hint:'今臺灣大學的前身'},
+  {id:12,type:'taiwan',cat:'book',col:0,event:'霧社事件',          year:1930,hint:'賽德克族的武裝起義'},
+  {id:13,type:'taiwan',cat:'book',col:0,event:'望春風歌曲發表',    year:1933,hint:'鄧雨賢創作的經典名曲'},
+  {id:14,type:'taiwan',cat:'book',col:0,event:'日月潭發電所',      year:1934,hint:'東亞規模最大的水力發電工程'},
+  {id:15,type:'taiwan',cat:'book',col:0,event:'皇民化運動',        year:1937,hint:'強制推行的文化同化政策'},
+  {id:16,type:'taiwan',cat:'book',col:1,event:'國民政府來臺灣',    year:1945,hint:'二戰結束後的政權移交'},
+  {id:17,type:'taiwan',cat:'book',col:1,event:'二二八事件',        year:1947,hint:'造成深遠影響的歷史傷痛'},
+  {id:18,type:'taiwan',cat:'book',col:1,event:'中華民國遷台',      year:1949,hint:'國共內戰後的政府撤退'},
+  {id:19,type:'taiwan',cat:'book',col:1,event:'發行新台幣',        year:1949,hint:'四萬換一元的幣制改革'},
+  {id:20,type:'taiwan',cat:'book',col:1,event:'土地改革',          year:1953,hint:'耕者有其田的農業政策'},
+  {id:21,type:'taiwan',cat:'book',col:1,event:'高雄加工出口區',    year:1966,hint:'帶動出口導向工業化的政策'},
+  {id:22,type:'taiwan',cat:'book',col:1,event:'推動十大建設',      year:1974,hint:'蔣經國推動的重大工程計畫'},
+  {id:23,type:'taiwan',cat:'book',col:1,event:'美麗島事件',        year:1979,hint:'民主運動的重要歷史轉折'},
+  {id:24,type:'taiwan',cat:'book',col:1,event:'新竹科學工業園區',  year:1980,hint:'科技產業發展的重要基地'},
+  {id:25,type:'taiwan',cat:'book',col:1,event:'民主進步黨成立',    year:1986,hint:'黨外運動走向正式組黨'},
+  {id:26,type:'taiwan',cat:'book',col:2,event:'解除戒嚴',          year:1987,hint:'長達38年的管制正式結束'},
+  {id:27,type:'taiwan',cat:'book',col:2,event:'解除報禁',          year:1988,hint:'言論自由開放的里程碑'},
+  {id:28,type:'taiwan',cat:'book',col:2,event:'解除黨禁',          year:1989,hint:'多黨政治時代正式開始'},
+  {id:29,type:'taiwan',cat:'book',col:2,event:'野百合學運',        year:1990,hint:'學生走上廣場爭取民主改革'},
+  {id:30,type:'taiwan',cat:'book',col:2,event:'人民直選總統',      year:1996,hint:'史上第一次總統直接選舉'},
+  {id:31,type:'taiwan',cat:'book',col:2,event:'第一次政黨輪替',    year:2000,hint:'陳水扁當選總統'},
+];
+var BONUS=[
+  {id:101,type:'world',   cat:'bonus',col:0,event:'貝多芬完成命運交響曲',year:1808,hint:'第五號交響曲，最著名的四個音符'},
+  {id:102,type:'world',   cat:'bonus',col:0,event:'第一次世界大戰爆發',  year:1914,hint:'薩拉熱窩事件引爆的全球衝突'},
+  {id:103,type:'world',   cat:'bonus',col:1,event:'第一座迪士尼樂園開幕',year:1955,hint:'加州安納罕，米奇的夢幻王國'},
+  {id:104,type:'world',   cat:'bonus',col:1,event:'合歡山滑雪場創立',    year:1966,hint:'台灣高山上的冬季樂園'},
+  {id:105,type:'world',   cat:'bonus',col:1,event:'任天堂紅白機發售',    year:1983,hint:'超級瑪利歐的誕生平台'},
+  {id:106,type:'world',   cat:'bonus',col:1,event:'台積電成立',          year:1987,hint:'護國神山的起點'},
+  {id:107,type:'world',   cat:'bonus',col:2,event:'網際網路公開使用',    year:1991,hint:'全球資訊網改變了世界'},
+  {id:108,type:'world',   cat:'bonus',col:2,event:'哈利波特出版',        year:1997,hint:'霍格華茲魔法學校的故事誕生'},
+  {id:109,type:'world',   cat:'bonus',col:2,event:'蘋果iPhone發表',      year:2007,hint:'賈伯斯改變了手機的樣貌'},
+  {id:110,type:'world',   cat:'bonus',col:2,event:'ChatGPT發布',        year:2022,hint:'AI對話時代的開始'},
+];
+
+var COLORS=['#e85050','#2d9e60','#3366cc','#e8a000','#9933cc','#cc3388'];
+var COL_NAMES=['日治時期','中華民國解嚴前','中華民國解嚴後'];
+var CONFETTI_COLORS=['#e8161c','#ffcc00','#22aa44','#0055cc','#ff6600','#cc00cc','#00ccaa'];
+
+// ══ 狀態 ══
+var players=[],selectedCount=3,soloMode=false;
+var bookDeck=[],bonusDeck=[];
+var placed=[[],[],[]];
+var bonusUnlocked=false,currentPlayer=0;
+var cur=null,curPhase='idle',curColConfirmed=-1;
+var curIsRetry=false,curColScoredBefore=false;
+var cardHistory={},revealCB=null;
+
+// ══ 設定 ══
+function setCount(n){
+  selectedCount=n;
+  document.querySelectorAll('.count-btn').forEach(function(b){b.classList.toggle('sel',parseInt(b.textContent)===n);});
+  // 單人模式：更改按鈕文字
+  var startBtn=document.querySelector('.start-btn');
+  if(startBtn) startBtn.textContent=(n===1?'✦ 單人挑戰，出發！ ✦':'✦ 穿越時空，出發！ ✦');
+  renderInputs();
+}
+function renderInputs(){
+  var defs=['玩家一','玩家二','玩家三','玩家四','玩家五','玩家六'];
+  var html='';
+  if(selectedCount===1){
+    html='<div class="player-row"><div class="p-dot c0"></div><input class="p-input" id="pn0" placeholder="輸入你的名字"></div>';
+  } else {
+    for(var i=0;i<selectedCount;i++){
+      html+='<div class="player-row"><div class="p-dot c'+i+'"></div><input class="p-input" id="pn'+i+'" placeholder="'+defs[i]+'"></div>';
+    }
+  }
+  document.getElementById('player-inputs').innerHTML=html;
+}
+function startGame(){
+  var names=[];
+  for(var i=0;i<selectedCount;i++){
+    var el=document.getElementById('pn'+i);
+    names.push(el&&el.value.trim()||'玩家'+(i+1));
+  }
+  soloMode=(selectedCount===1);
+  players=names.map(function(n,i){return{name:n,color:COLORS[i],score:0};});
+  bookDeck=shuffle(BOOK.slice()); bonusDeck=shuffle(BONUS.slice());
+  placed=[[],[],[]]; bonusUnlocked=false; cardHistory={};
+  currentPlayer=0; curPhase='idle'; cur=null;
+  document.getElementById('screen-splash').classList.add('gone');
+  document.getElementById('screen-rules').classList.remove('gone');
+}
+function beginGame(){
+  document.getElementById('screen-rules').classList.add('gone');
+  renderAll();
+  updateDeckCounts();
+}
+
+// ══ 渲染 ══
+function renderAll(){ renderScoreboard(); renderTurnBanner(); renderCols(); }
+
+function renderScoreboard(){
+  var html='';
+  players.forEach(function(p,i){
+    html+='<div class="score-card'+(i===currentPlayer?' active':'')+'" style="'+(i===currentPlayer?'border-color:#e8a000':'')+'">'
+      +'<div class="score-name">'+p.name+'</div>'
+      +'<div class="score-pts" id="pts'+i+'">'+p.score+'</div>'
+      +'<div class="score-lbl">分</div></div>';
+  });
+  document.getElementById('scoreboard').innerHTML=html;
+}
+
+function renderTurnBanner(){
+  document.getElementById('turn-who').textContent=players[currentPlayer].name;
+  var phases={idle:'請選擇抽牌','pick-col':'選擇正確的時代欄位','pick-seq':'選擇正確的時間位置'};
+  document.getElementById('turn-phase').textContent=phases[curPhase]||'';
+  document.getElementById('draw-btn').classList.toggle('disabled',curPhase!=='idle');
+}
+
+function renderCols(){
+  var area=document.getElementById('cols-area');
+  area.className='cols-area';
+  if(curPhase==='pick-seq') area.classList.add('exp'+curColConfirmed);
+  for(var c=0;c<3;c++){
+    var col=document.getElementById('col'+c);
+    var cards=document.getElementById('cards'+c);
+    document.getElementById('cnt'+c).textContent=placed[c].length;
+    col.classList.remove('selectable','expanded','shrunk');
+    if(curPhase==='pick-col') col.classList.add('selectable');
+    else if(curPhase==='pick-seq'){
+      if(c===curColConfirmed) col.classList.add('expanded');
+      else col.classList.add('shrunk');
+    }
+    var sorted=placed[c].slice().sort(function(a,b){return a.year-b.year;});
+    var html='';
+    if(curPhase==='pick-seq'&&c===curColConfirmed){
+      html+=insBtnHTML(c,0);
+      sorted.forEach(function(card,i){html+=evCardHTML(card)+insBtnHTML(c,i+1);});
+      if(sorted.length===0) html=insBtnHTML(c,0);
+    } else {
+      if(sorted.length===0) html='<div class="col-empty">尚無事件</div>';
+      else sorted.forEach(function(card){html+=evCardHTML(card);});
+    }
+    cards.innerHTML=html;
+  }
+}
+
+function evCardHTML(card){
+  var sc=card.stampRevealed?' show':'';
+  return '<div class="ev-card '+card.type+'"><span class="ev-name">'+card.event+'</span>'
+    +'<div class="stamp'+sc+'">'+card.year+'</div></div>';
+}
+function insBtnHTML(c,pos){
+  return '<button class="ins-btn" onclick="seqClick('+c+','+pos+',event)">▼ 放在這裡</button>';
+}
+
+function updateDeckCounts(){
+  document.getElementById('draw-count').textContent=bookDeck.length+' 張';
+  document.getElementById('bonus-count').textContent=bonusDeck.length+' 張';
+}
+
+// ══ 抽牌 ══
+function doDraw(){
+  if(curPhase!=='idle') return;
+  if(bookDeck.length===0){checkEnd();return;}
+  sfxDraw();
+  startCard(bookDeck.pop());
+  updateDeckCounts();
+}
+function doBonus(){
+  if(!bonusUnlocked||curPhase!=='idle') return;
+  if(bonusDeck.length===0) return;
+  sfxDraw();
+  startCard(bonusDeck.pop());
+  updateDeckCounts();
+}
+function startCard(card){
+  cur=card;
+  curColConfirmed=-1;
+  curIsRetry=(cardHistory[card.id]!==undefined);
+  curColScoredBefore=curIsRetry&&cardHistory[card.id]&&cardHistory[card.id].colScored;
+  curPhase='pick-col';
+  showCurCard(card,curIsRetry);
+  document.getElementById('status-msg').textContent=curIsRetry?'⚡ 再來一次！選欄位':'選擇屬於哪個時代';
+  renderAll();
+}
+function showCurCard(card,isRetry){
+  var lbl=card.type==='world'?'🌍 世界趣味':(card.type==='bonus-tw'?'🇹🇼 台灣有趣':'🇹🇼 臺灣史');
+  document.getElementById('cur-card-wrap').innerHTML=
+    '<div style="position:relative">'+(isRetry?'<div class="retry-badge">再來<br>一次！</div>':'')
+    +'<div class="cur-card '+card.type+'">'
+    +'<div class="cur-card-type">'+lbl+'</div>'
+    +'<div class="cur-card-event">'+card.event+'</div>'
+    +'<div class="cur-card-hint">'+card.hint+'</div>'
+    +'<div class="cur-card-yr">？年</div>'
+    +'</div></div>';
+}
+
+// ══ 猜欄位 ══
+function colClick(idx){
+  if(curPhase!=='pick-col') return;
+  var correct=(idx===cur.col);
+  if(correct){
+    curColConfirmed=idx;
+    var pts=0;
+    if(!curColScoredBefore){
+      pts=(cur.type==='world'||cur.type==='bonus-tw')?5:1;
+      addScore(currentPlayer,pts);
+      if(!cardHistory[cur.id]) cardHistory[cur.id]={colScored:false};
+      cardHistory[cur.id].colScored=true;
+    }
+    curPhase='pick-seq';
+    document.getElementById('status-msg').textContent='選擇正確的時間位置';
+    showFxColOk(function(){renderAll();});
+  } else {
+    if(curIsRetry||soloMode){
+      showFxWrong(function(){doReveal(true,true,function(){endTurn(false);});});
+    } else {
+      if(!cardHistory[cur.id]) cardHistory[cur.id]={colScored:false};
+      returnCard();
+      showFxWrong(function(){endTurn(false);});
+    }
+  }
+}
+
+// ══ 猜時序 ══
+function seqClick(c,pos,e){
+  if(e) e.stopPropagation();
+  if(curPhase!=='pick-seq') return;
+  var sorted=placed[c].slice().sort(function(a,b){return a.year-b.year;});
+  var before=sorted[pos-1],after=sorted[pos];
+  var correct=(!before||before.year<=cur.year)&&(!after||after.year>=cur.year);
+  if(correct){
+    var seqPts=placed[c].length;
+    addScore(currentPlayer,seqPts);
+    placeCard(c,cur,true);
+    sfxStamp();
+    checkUnlock();
+    showFxSeqOk(seqPts,function(){endTurn(true);});
+  } else {
+    if(curIsRetry||soloMode){
+      showFxWrong(function(){doReveal(false,true,function(){endTurn(false);});});
+    } else {
+      var prevColScored=cardHistory[cur.id]?cardHistory[cur.id].colScored:false;
+      cardHistory[cur.id]={colScored:prevColScored};
+      returnCard();
+      showFxWrong(function(){endTurn(false);});
+    }
+  }
+}
+
+// 丟回牌堆（區分課本/機會牌）
+function returnCard(){
+  if(cur.cat==='bonus'){
+    bonusDeck.unshift(cur); shuffle(bonusDeck);
+  } else {
+    bookDeck.unshift(cur); shuffle(bookDeck);
+  }
+  updateDeckCounts();
+}
+
+// ══ 特效 ══
+function showFxWrong(cb){
+  sfxWrong();
+  var sub=document.getElementById('fx-wrong-sub');
+  if(sub) sub.textContent=soloMode?'公布答案！':'下面一位！';
+  var el=document.getElementById('fx-wrong');
+  el.classList.add('show','fx-wrong-shake');
+  setTimeout(function(){el.classList.remove('show','fx-wrong-shake');if(cb)cb();},1600);
+}
+function showFxColOk(cb){
+  sfxColOk();
+  var el=document.getElementById('fx-col-ok');
+  el.classList.add('show');
+  setTimeout(function(){el.classList.remove('show');if(cb)cb();},1000);
+}
+function showFxSeqOk(pts,cb){
+  sfxSeqOk();
+  document.getElementById('fx-seq-pts').textContent=(pts>0?'+'+pts+'分':'放對了！');
+  spawnConfetti();
+  spawnArcadePop(pts);
+  var el=document.getElementById('fx-seq-ok');
+  el.classList.add('show');
+  setTimeout(function(){el.classList.remove('show');document.getElementById('confetti-wrap').innerHTML='';if(cb)cb();},1800);
+}
+
+function spawnArcadePop(pts){
+  if(pts<=0) return;
+  var el=document.createElement('div');
+  el.className='arcade-pop';
+  el.textContent='+'+pts;
+  el.style.left='50%';
+  el.style.top='55%';
+  document.body.appendChild(el);
+  setTimeout(function(){el.remove();},1700);
+}
+
+function spawnConfetti(){
+  var wrap=document.getElementById('confetti-wrap'); wrap.innerHTML='';
+  for(var i=0;i<65;i++){
+    var div=document.createElement('div'); div.className='confetti';
+    div.style.left=Math.random()*100+'%'; div.style.top='-20px';
+    div.style.background=CONFETTI_COLORS[Math.floor(Math.random()*CONFETTI_COLORS.length)];
+    div.style.width=(8+Math.random()*14)+'px'; div.style.height=(8+Math.random()*14)+'px';
+    div.style.animationDuration=(1.2+Math.random()*1.2)+'s'; div.style.animationDelay=(Math.random()*0.5)+'s';
+    div.style.borderRadius=Math.random()>0.5?'50%':'2px'; wrap.appendChild(div);
+  }
+}
+
+// ══ 公布答案 ══
+function doReveal(revealCol,revealSeq,cb){
+  revealCB=cb;
+  var body='';
+  if(revealCol) body+='正確欄位：<strong>'+COL_NAMES[cur.col]+'</strong><br>';
+  body+='正確年份：<strong>'+cur.year+' 年</strong><br><br>「'+cur.event+'」<br>'+cur.hint+'<br><br>本回合無人得分。';
+  document.getElementById('rev-sfx').textContent=revealCol?'公布！！':'時序公布！';
+  document.getElementById('rev-body').innerHTML=body;
+  placeCard(cur.col,cur,true); sfxStamp(); renderCols(); checkUnlock();
+  document.getElementById('modal-reveal').classList.add('show');
+}
+function closeReveal(){ document.getElementById('modal-reveal').classList.remove('show'); if(revealCB){revealCB();revealCB=null;} }
+
+// ══ 放牌 ══
+function placeCard(c,card,stamp){ card.stampRevealed=stamp; placed[c].push(card); placed[c].sort(function(a,b){return a.year-b.year;}); }
+
+// ══ 回合結束 ══
+function endTurn(cardPlaced){
+  if(cardPlaced) delete cardHistory[cur.id];
+  cur=null; curColConfirmed=-1; curIsRetry=false; curColScoredBefore=false; curPhase='idle';
+  if(!soloMode) currentPlayer=(currentPlayer+1)%players.length;
+  document.getElementById('cur-card-wrap').innerHTML='<div class="cur-placeholder">等待抽牌</div>';
+  document.getElementById('status-msg').textContent='選擇左側牌堆開始';
+  renderAll(); checkEnd();
+}
+
+// ══ 解鎖 ══
+function checkUnlock(){
+  if(bonusUnlocked) return;
+  if(placed[0].length>=3&&placed[1].length>=3&&placed[2].length>=3){
+    bonusUnlocked=true; sfxUnlock();
+    document.getElementById('bonus-btn').classList.remove('locked');
+    document.getElementById('bonus-count').style.color='#b8860b';
+    document.getElementById('lock-hint').textContent='解鎖！高風險高報酬';
+    setTimeout(function(){document.getElementById('modal-unlock').classList.add('show');},500);
+  }
+}
+
+// ══ 結算 ══
+function checkEnd(){ if(bookDeck.length===0&&bonusDeck.length===0&&curPhase==='idle') setTimeout(showEnd,600); }
+
+function showEnd(){
+  sfxWin();
+  if(soloMode){
+    showEndSolo();
+  } else {
+    showEndMulti();
+  }
+  setTimeout(function(){spawnWinConfetti();},300);
+  document.getElementById('screen-end').classList.add('show');
+}
+
+function showEndSolo(){
+  var p=players[0];
+  // 計算最高可得分（每張課本牌欄位1分、機會牌5分；時序分略估不算）
+  var totalCards=BOOK.length+BONUS.length;
+  var maxColScore=BOOK.length*1+BONUS.length*5; // 欄位最高分
+  var rate=(maxColScore>0)?p.score/maxColScore:0;
+  var rank,emoji,color;
+  if(rate>=1){       rank='時光機發明家'; emoji='🌟'; color='#ffdd44';}
+  else if(rate>=0.8){rank='時光機駕駛員'; emoji='🚀'; color='#66ccff';}
+  else if(rate>=0.6){rank='歷史見習生';   emoji='📖'; color='#88dd66';}
+  else               {rank='時空迷路者';   emoji='🌀'; color='#ff8888';}
+
+  document.getElementById('end-lbl').textContent='🎯 挑戰完成！';
+  document.getElementById('end-winner').textContent=p.name+'！';
+  document.getElementById('podium-wrap').innerHTML=
+    '<div style="text-align:center;padding:20px 0">'
+    +'<div style="font-size:80px;margin-bottom:12px">'+emoji+'</div>'
+    +'<div style="font-size:clamp(28px,6vw,52px);font-weight:900;color:'+color+';text-shadow:3px 3px 0 #111,-1px -1px 0 #333;letter-spacing:2px">'+rank+'</div>'
+    +'<div style="font-size:clamp(36px,7vw,64px);font-weight:900;color:#ffdd44;text-shadow:3px 3px 0 #e8161c;margin-top:16px">'+p.score+' 分</div>'
+    +'<div style="font-size:13px;color:rgba(255,255,255,0.4);margin-top:8px;letter-spacing:2px">得分率 '+(Math.round(rate*100))+'%</div>'
+    +'</div>';
+  document.getElementById('end-others').innerHTML='';
+}
+
+function showEndMulti(){
+  var sorted=players.slice().sort(function(a,b){return b.score-a.score;});
+  var winner=sorted[0];
+  document.getElementById('end-lbl').textContent='🏆 獲勝者';
+  document.getElementById('end-winner').textContent=winner.name+' 獲勝！';
+
+  var top3=sorted.slice(0,3);
+  var display=[top3[1],top3[0],top3[2]].filter(Boolean);
+  var ranks=[2,1,3];
+  var podiumHTML='';
+  display.forEach(function(p,i){
+    var rank=ranks[i];
+    var crown=rank===1?'👑':'';
+    var cls='podium-'+(rank===1?'1st':rank===2?'2nd':'3rd');
+    var rankNum=rank===1?'🥇':rank===2?'🥈':'🥉';
+    podiumHTML+='<div class="podium-slot '+cls+'">'
+      +(crown?'<div class="podium-crown">'+crown+'</div>':'')
+      +'<div class="podium-name" style="color:'+p.color+'">'+p.name+'</div>'
+      +'<div class="podium-pts">'+p.score+'分</div>'
+      +'<div class="podium-block"><span class="podium-num">'+rankNum+'</span></div>'
+      +'</div>';
+  });
+  document.getElementById('podium-wrap').innerHTML=podiumHTML;
+
+  var others=sorted.slice(3);
+  document.getElementById('end-others').innerHTML=others.map(function(p){
+    return '<div class="end-sc"><div class="end-sc-n" style="color:'+p.color+'">'+p.name+'</div>'
+      +'<div class="end-sc-v">'+p.score+'</div><div class="end-sc-l">分</div></div>';
+  }).join('');
+}
+
+function spawnWinConfetti(){
+  for(var i=0;i<100;i++){
+    var el=document.createElement('div');
+    el.className='confetti';
+    el.style.cssText='position:fixed;left:'+Math.random()*100+'%;top:-20px;z-index:160;'
+      +'background:'+CONFETTI_COLORS[Math.floor(Math.random()*CONFETTI_COLORS.length)]+';'
+      +'width:'+(8+Math.random()*16)+'px;height:'+(8+Math.random()*16)+'px;'
+      +'animation:confetti-fall '+(2+Math.random()*2)+'s ease-out '+(Math.random()*1)+'s forwards;'
+      +'border-radius:'+(Math.random()>0.5?'50%':'2px')+';';
+    document.body.appendChild(el);
+    setTimeout(function(e){return function(){e.remove();};}(el), 4000);
+  }
+}
+
+// ══ 工具 ══
+function addScore(idx,pts){
+  if(pts<=0) return;
+  players[idx].score+=pts;
+  document.getElementById('pts'+idx).textContent=players[idx].score;
+}
+function shuffle(arr){
+  for(var i=arr.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1)),t=arr[i];arr[i]=arr[j];arr[j]=t;}
+  return arr;
+}
+function closeModal(id){ document.getElementById(id).classList.remove('show'); }
+
+// SFX輪播
+var sfxList=['歷史！','傳說！','挑戰！','燃えろ！','必勝！','衝啊！'];
+var sfxIdx=0;
+setInterval(function(){ sfxIdx=(sfxIdx+1)%sfxList.length; document.getElementById('title-sfx').textContent=sfxList[sfxIdx]; },3000);
+
+renderInputs();
+</script>
+</body>
+</html>
