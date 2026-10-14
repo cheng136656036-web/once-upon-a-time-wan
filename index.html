@@ -4,6 +4,209 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Once upon a Time灣</title>
+<!-- Firebase SDK -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getDatabase, ref, set, get, onValue, serverTimestamp }
+    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyB3nvbc0ZKI8kcW1Nd1y7HnPVdlyqO5ZBE",
+    authDomain: "once-upon-a-time-wan.firebaseapp.com",
+    databaseURL: "https://once-upon-a-time-wan-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "once-upon-a-time-wan",
+    storageBucket: "once-upon-a-time-wan.firebasestorage.app",
+    messagingSenderId: "683579856979",
+    appId: "1:683579856979:web:2d57964346090098844ea6"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+
+  function genCode(){ return Math.floor(1000+Math.random()*9000).toString(); }
+  function myId(){
+    if(!window._uid) window._uid='p'+Date.now()+Math.random().toString(36).slice(2,6);
+    return window._uid;
+  }
+
+  // 建立房間
+  window.fbCreateRoom = async function(hostName, timeSec){
+    var code = genCode();
+    await set(ref(db,'rooms/'+code), {
+      host: myId(), timeSec: timeSec, status:'waiting', created: serverTimestamp(),
+      players:{ [myId()]:{name:hostName,score:0,color:'#e85050',joinedAt:Date.now()} }
+    });
+    window._roomCode=code; window._isHost=true; window._myName=hostName;
+    document.getElementById('room-code-num').textContent=code;
+    listenRoom(code);
+    showPanel('online-panel-waiting');
+  };
+
+  // 加入房間
+  window.fbJoinRoom = async function(code, playerName){
+    var snap=await get(ref(db,'rooms/'+code));
+    if(!snap.exists()){alert('找不到房間碼 '+code);return;}
+    var data=snap.val();
+    if(data.status!=='waiting'){alert('遊戲已開始！');return;}
+    var players=data.players||{};
+    var count=Object.keys(players).length;
+    if(count>=4){alert('房間已滿！');return;}
+    var colors=['#e85050','#2d9e60','#3366cc','#e8a000'];
+    var used=Object.values(players).map(function(p){return p.color;});
+    var color=colors.find(function(c){return used.indexOf(c)===-1;})||colors[count];
+    await set(ref(db,'rooms/'+code+'/players/'+myId()),{name:playerName,score:0,color:color,joinedAt:Date.now()});
+    window._roomCode=code; window._isHost=false; window._myName=playerName;
+    document.getElementById('room-code-num').textContent=code;
+    listenRoom(code);
+    showPanel('online-panel-waiting');
+  };
+
+  // 監聽房間
+  function listenRoom(code){
+    onValue(ref(db,'rooms/'+code), function(snap){
+      if(!snap.exists()) return;
+      var data=snap.val();
+      updateWaitingUI(data);
+      if(data.status==='playing' && !window._onlineGameStarted){
+        window._onlineGameStarted=true;
+        startOnlineGame(data);
+      }
+      if(data.status==='playing'){
+        window._onlineCurrentPlayer=data.currentPlayer;
+        updateOnlineTurnUI(data);
+        if(data.players) syncOnlineScores(data.players);
+      }
+    });
+  }
+
+  // 開始遊戲（房主）
+  window.fbStartGame = async function(){
+    var code=window._roomCode;
+    var snap=await get(ref(db,'rooms/'+code+'/players'));
+    if(!snap.exists()) return;
+    var players=snap.val();
+    if(Object.keys(players).length<2){alert('至少需要 2 人！');return;}
+    var keys=Object.keys(players).sort(function(a,b){return (players[a].joinedAt||0)-(players[b].joinedAt||0);});
+    await set(ref(db,'rooms/'+code+'/status'),'playing');
+    await set(ref(db,'rooms/'+code+'/currentPlayer'),keys[0]);
+    await set(ref(db,'rooms/'+code+'/seed'),Date.now());
+    await set(ref(db,'rooms/'+code+'/turnStarted'),serverTimestamp());
+  };
+
+  // 換人
+  window.fbNextTurn = async function(data){
+    var code=window._roomCode;
+    if(!window._isHost) return;
+    var snap=await get(ref(db,'rooms/'+code+'/players'));
+    if(!snap.exists()) return;
+    var players=snap.val();
+    var keys=Object.keys(players).sort(function(a,b){return (players[a].joinedAt||0)-(players[b].joinedAt||0);});
+    var idx=keys.indexOf(data.currentPlayer);
+    var next=keys[(idx+1)%keys.length];
+    await set(ref(db,'rooms/'+code+'/currentPlayer'),next);
+    await set(ref(db,'rooms/'+code+'/turnStarted'),serverTimestamp());
+  };
+
+  // 加分
+  window.fbAddScore = async function(pts){
+    var code=window._roomCode;
+    var snap=await get(ref(db,'rooms/'+code+'/players/'+myId()+'/score'));
+    var cur=snap.val()||0;
+    await set(ref(db,'rooms/'+code+'/players/'+myId()+'/score'),cur+pts);
+  };
+
+  // 等待室 UI
+  function updateWaitingUI(data){
+    var players=data.players||{};
+    var entries=Object.entries(players).sort(function(a,b){return (a[1].joinedAt||0)-(b[1].joinedAt||0);});
+    var html='';
+    entries.forEach(function(e){
+      var pid=e[0],p=e[1];
+      html+='<div class="waiting-slot filled">'
+        +'<span class="wp-dot" style="background:'+p.color+'"></span>'
+        +'<span class="wp-name">'+p.name+(pid===myId()?' （你）':'')+'</span>'
+        +'<span class="wp-host">'+(pid===data.host?'👑 房主':'')+'</span>'
+        +'</div>';
+    });
+    for(var i=entries.length;i<4;i++){
+      html+='<div class="waiting-slot empty"><span class="wp-dot" style="background:#555"></span><span class="wp-name" style="color:#555">等待中…</span><span class="wp-host"></span></div>';
+    }
+    document.getElementById('waiting-players').innerHTML=html;
+    var btn=document.getElementById('online-start-btn');
+    if(btn) btn.style.display=(window._isHost&&entries.length>=2)?'block':'none';
+  }
+
+  // 即時排行
+  function syncOnlineScores(playersData){
+    var entries=Object.entries(playersData).sort(function(a,b){return b[1].score-a[1].score;});
+    var medals=['🥇','🥈','🥉','4️⃣'];
+    var html='<div class="osb-title">🏆 即時排行</div>';
+    entries.forEach(function(e,i){
+      var p=e[1],isMe=e[0]===myId();
+      html+='<div class="osb-row"><span class="osb-rank">'+medals[i]+'</span>'
+        +'<span class="osb-name" style="color:'+(isMe?'#ffdd44':'#fff')+'">'+p.name+'</span>'
+        +'<span class="osb-pts">'+p.score+'</span></div>';
+    });
+    var sb=document.getElementById('online-scoreboard');
+    sb.innerHTML=html; sb.classList.add('show');
+  }
+
+  // 回合 UI
+  var _timerInterval=null;
+  function updateOnlineTurnUI(data){
+    var isMyTurn=data.currentPlayer===myId();
+    // sync currentPlayer index for renderTurnBanner
+    if(window.players){
+      var idx=window.players.findIndex(function(p){return p.id===data.currentPlayer;});
+      if(idx>=0){ window.currentPlayer=idx; if(typeof renderAll==='function') renderAll(); }
+    }
+    document.querySelectorAll('.col,.deck-btn').forEach(function(el){
+      el.style.pointerEvents=isMyTurn?'':'none';
+      el.style.opacity=isMyTurn?'':'0.5';
+    });
+    if(data.turnStarted && data.timeSec){
+      clearInterval(_timerInterval);
+      var timer=document.getElementById('turn-timer');
+      var num=document.getElementById('timer-num');
+      timer.classList.add('show');
+      var started=data.turnStarted;
+      _timerInterval=setInterval(function(){
+        var left=Math.ceil(data.timeSec-(Date.now()-started)/1000);
+        if(left<=0){
+          clearInterval(_timerInterval);
+          num.textContent='0';
+          timer.classList.add('urgent');
+          if(isMyTurn && window._isHost) fbNextTurn(data);
+          return;
+        }
+        num.textContent=left;
+        timer.classList.toggle('urgent',left<=3);
+      },300);
+    }
+  }
+
+  // 啟動線上遊戲
+  function startOnlineGame(data){
+    document.getElementById('screen-online').classList.add('gone');
+    var pEntries=Object.entries(data.players||{}).sort(function(a,b){
+      return (a[1].joinedAt||0)-(b[1].joinedAt||0);
+    });
+    window.players=pEntries.map(function(e){
+      return {id:e[0],name:e[1].name,score:0,color:e[1].color};
+    });
+    window.selectedCount=window.players.length;
+    window.soloMode=false;
+    window.onlineMode=true;
+    window._roomSeed=data.seed||Date.now();
+    // currentPlayer index: find my position in sorted list
+    var myIdx=window.players.findIndex(function(p){return p.id===myId();});
+    window._myPlayerIdx=myIdx>=0?myIdx:0;
+    if(window._gameReady) window.startGame();
+  }
+
+  window._fbReady=true;
+  window.fbMyId=myId;
+</script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: 'PingFang TC','微軟正黑體','Microsoft JhengHei',sans-serif;
@@ -397,6 +600,115 @@ body { font-family: 'PingFang TC','微軟正黑體','Microsoft JhengHei',sans-se
 .s-label { font-size:10px; color:rgba(255,255,255,0.5); letter-spacing:1px; margin-bottom:2px; }
 .s-val   { font-size:18px; font-weight:900; color:white; }
 .s-val em { color:#ffcc00; font-style:normal; }
+/* ── 連線對戰按鈕 ── */
+.online-btn {
+  width:100%; padding:11px; font-size:15px; font-weight:900; letter-spacing:2px;
+  border:2px solid rgba(100,200,255,0.5); border-radius:10px; cursor:pointer;
+  background:rgba(60,140,255,0.12); color:rgba(100,200,255,0.9);
+  transition:all 0.2s;
+}
+.online-btn:hover { background:rgba(60,140,255,0.25); border-color:rgba(100,200,255,0.8); }
+
+/* ── 連線對戰畫面 ── */
+#screen-online {
+  position:fixed; inset:0; z-index:200;
+  background:#0a0614;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  overflow:hidden;
+}
+#screen-online.gone { display:none; }
+.online-content {
+  position:relative; z-index:2; width:100%; max-width:480px;
+  padding:20px 24px; text-align:center;
+}
+.online-content.gone { display:none; }
+.back-btn {
+  display:inline-block; margin-bottom:16px;
+  background:none; border:none; color:rgba(255,220,80,0.6);
+  font-size:14px; font-weight:700; cursor:pointer; letter-spacing:1px;
+  padding:6px 12px; border:1px solid rgba(255,220,80,0.3); border-radius:6px;
+}
+.back-btn:hover { color:#ffdd44; border-color:#ffdd44; }
+.online-title {
+  font-size:clamp(22px,4vw,34px); font-weight:900; color:#ffdd44;
+  text-shadow:3px 3px 0 rgba(232,22,28,0.4); margin-bottom:6px; letter-spacing:2px;
+}
+.online-subtitle { font-size:13px; color:rgba(255,255,255,0.4); letter-spacing:2px; margin-bottom:24px; }
+.online-cards { display:flex; gap:14px; justify-content:center; flex-wrap:wrap; }
+.online-card {
+  flex:1; min-width:140px; max-width:180px;
+  background:rgba(255,255,255,0.06); border:2px solid rgba(255,220,80,0.25);
+  border-radius:14px; padding:24px 16px; cursor:pointer; transition:all 0.2s;
+}
+.online-card:hover { background:rgba(255,220,80,0.1); border-color:rgba(255,220,80,0.6); transform:translateY(-4px); }
+.online-card-icon { font-size:36px; margin-bottom:10px; }
+.online-card-label { font-size:16px; font-weight:900; color:#fff; margin-bottom:6px; }
+.online-card-desc { font-size:12px; color:rgba(255,255,255,0.4); line-height:1.5; }
+.online-form { text-align:left; }
+.online-form-label { font-size:12px; letter-spacing:2px; color:rgba(255,220,80,0.6); margin-bottom:8px; }
+.online-input {
+  width:100%; padding:12px 14px; background:rgba(255,255,255,0.08);
+  border:2px solid rgba(255,220,80,0.25); border-radius:8px;
+  font-family:inherit; font-size:16px; color:#fff; outline:none;
+}
+.online-input:focus { border-color:rgba(255,220,80,0.6); }
+.online-input::placeholder { color:rgba(255,255,255,0.25); }
+.online-code-input { font-size:28px; font-weight:900; text-align:center; letter-spacing:8px; }
+.time-row { display:flex; gap:10px; }
+.time-btn {
+  flex:1; padding:10px; background:rgba(255,255,255,0.06);
+  border:2px solid rgba(255,220,80,0.25); border-radius:8px;
+  color:rgba(255,220,80,0.5); font-size:16px; font-weight:900; cursor:pointer; transition:all 0.18s;
+}
+.time-btn.sel { background:rgba(255,220,80,0.15); border-color:#ffdd44; color:#ffdd44; }
+
+/* 等待室 */
+.room-code-display {
+  background:rgba(255,220,80,0.08); border:2px solid rgba(255,220,80,0.3);
+  border-radius:14px; padding:18px 24px; margin-bottom:20px; text-align:center;
+}
+.room-code-label { font-size:11px; letter-spacing:3px; color:rgba(255,220,80,0.5); margin-bottom:6px; }
+.room-code-num { font-size:52px; font-weight:900; color:#ffdd44; letter-spacing:12px; text-shadow:0 0 20px rgba(255,220,80,0.4); }
+.room-code-hint { font-size:11px; color:rgba(255,255,255,0.3); margin-top:4px; letter-spacing:1px; }
+.waiting-players { display:flex; flex-direction:column; gap:8px; margin-bottom:16px; }
+.waiting-slot {
+  display:flex; align-items:center; gap:10px;
+  background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1);
+  border-radius:10px; padding:10px 14px;
+}
+.waiting-slot.filled { border-color:rgba(255,220,80,0.2); background:rgba(255,220,80,0.05); }
+.wp-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+.wp-name { flex:1; font-size:15px; font-weight:700; color:#fff; }
+.wp-host { font-size:12px; color:rgba(255,220,80,0.7); }
+.waiting-hint { font-size:12px; color:rgba(255,255,255,0.3); letter-spacing:1px; margin-bottom:16px; }
+
+/* 遊戲中排行榜（右上角）*/
+#online-scoreboard {
+  position:fixed; top:10px; right:10px; z-index:100;
+  background:rgba(10,6,20,0.85); border:2px solid rgba(255,220,80,0.3);
+  border-radius:10px; padding:8px 12px; min-width:130px;
+  display:none;
+}
+#online-scoreboard.show { display:block; }
+.osb-title { font-size:10px; letter-spacing:2px; color:rgba(255,220,80,0.5); margin-bottom:6px; }
+.osb-row { display:flex; align-items:center; gap:6px; margin-bottom:4px; font-size:13px; }
+.osb-rank { color:rgba(255,220,80,0.6); width:18px; text-align:center; font-weight:900; }
+.osb-name { flex:1; color:#fff; font-weight:700; }
+.osb-pts { color:#ffdd44; font-weight:900; }
+
+/* 回合計時器 */
+#turn-timer {
+  position:fixed; top:10px; left:50%; transform:translateX(-50%);
+  z-index:100; display:none;
+  background:#111; border:3px solid #e8161c; border-radius:50%;
+  width:54px; height:54px; align-items:center; justify-content:center;
+  font-size:22px; font-weight:900; color:#fff;
+  box-shadow:0 0 16px rgba(232,22,28,0.5);
+}
+#turn-timer.show { display:flex; }
+#turn-timer.urgent { animation:timer-urgent 0.5s ease infinite alternate; }
+@keyframes timer-urgent { from{border-color:#e8161c;color:#fff} to{border-color:#ff6600;color:#ff6600;box-shadow:0 0 24px rgba(255,100,0,0.8)} }
+
 .rules-footer {
   background:#fafaf5; padding:16px 24px;
   display:flex; align-items:center; justify-content:space-between;
@@ -528,7 +840,91 @@ body { font-family: 'PingFang TC','微軟正黑體','Microsoft JhengHei',sans-se
       </div>
       <div class="player-inputs" id="player-inputs"></div>
       <button class="start-btn" onclick="startGame()">✦ 穿越時空，出發！ ✦</button>
+      <div style="margin-top:12px;">
+        <button class="online-btn" onclick="showOnlineScreen()">🌐 連線對戰</button>
+      </div>
     </div>
+  </div>
+</div>
+
+<!-- ══ 連線對戰畫面 ══ -->
+<div id="screen-online" class="gone">
+  <div class="splash-stars">
+    <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+      <g opacity="0.8">
+        <circle cx="5%"  cy="8%"  r="1.5" fill="white"/><circle cx="15%" cy="3%"  r="1"   fill="white"/>
+        <circle cx="25%" cy="12%" r="2"   fill="white"/><circle cx="40%" cy="5%"  r="1"   fill="white"/>
+        <circle cx="55%" cy="9%"  r="1.5" fill="white"/><circle cx="70%" cy="4%"  r="1"   fill="white"/>
+        <circle cx="82%" cy="14%" r="2"   fill="white"/><circle cx="92%" cy="7%"  r="1.5" fill="white"/>
+        <circle cx="10%" cy="25%" r="1"   fill="white"/><circle cx="88%" cy="30%" r="1"   fill="white"/>
+        <circle cx="3%"  cy="50%" r="1.5" fill="white"/><circle cx="97%" cy="55%" r="1"   fill="white"/>
+        <circle cx="20%" cy="80%" r="1"   fill="white"/><circle cx="75%" cy="85%" r="1.5" fill="white"/>
+      </g>
+    </svg>
+  </div>
+  <div class="online-content" id="online-panel-lobby">
+    <button class="back-btn" onclick="hideOnlineScreen()">← 返回</button>
+    <div class="online-title">🌐 連線對戰</div>
+    <div class="online-subtitle">最多 4 人，各用自己的裝置</div>
+    <div class="online-cards">
+      <div class="online-card" onclick="showCreateRoom()">
+        <div class="online-card-icon">🏠</div>
+        <div class="online-card-label">建立新房間</div>
+        <div class="online-card-desc">產生房間碼，等朋友加入</div>
+      </div>
+      <div class="online-card" onclick="showJoinRoom()">
+        <div class="online-card-icon">🚪</div>
+        <div class="online-card-label">加入房間</div>
+        <div class="online-card-desc">輸入房間碼，加入遊戲</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 建立房間面板 -->
+  <div class="online-content gone" id="online-panel-create">
+    <button class="back-btn" onclick="backToLobby()">← 返回</button>
+    <div class="online-title">建立新房間</div>
+    <div class="online-form">
+      <div class="online-form-label">你的名字</div>
+      <input class="online-input" id="create-name" placeholder="輸入名字" maxlength="8"/>
+      <div class="online-form-label" style="margin-top:14px;">每回合時間</div>
+      <div class="time-row">
+        <button class="time-btn sel" onclick="selectTime(10,this)">10 秒</button>
+        <button class="time-btn" onclick="selectTime(15,this)">15 秒</button>
+      </div>
+      <button class="start-btn" style="margin-top:20px;" onclick="showWaitingRoom()">建立房間</button>
+    </div>
+  </div>
+
+  <!-- 加入房間面板 -->
+  <div class="online-content gone" id="online-panel-join">
+    <button class="back-btn" onclick="backToLobby()">← 返回</button>
+    <div class="online-title">加入房間</div>
+    <div class="online-form">
+      <div class="online-form-label">你的名字</div>
+      <input class="online-input" id="join-name" placeholder="輸入名字" maxlength="8"/>
+      <div class="online-form-label" style="margin-top:14px;">房間碼</div>
+      <input class="online-input online-code-input" id="join-code" placeholder="4 位數字" maxlength="4"/>
+      <button class="start-btn" style="margin-top:20px;" onclick="showWaitingRoom(true)">加入房間</button>
+    </div>
+  </div>
+
+  <!-- 等待室 -->
+  <div class="online-content gone" id="online-panel-waiting">
+    <div class="online-title">等待玩家加入</div>
+    <div class="room-code-display">
+      <div class="room-code-label">房間碼</div>
+      <div class="room-code-num" id="room-code-num">7823</div>
+      <div class="room-code-hint">分享這個號碼給朋友</div>
+    </div>
+    <div class="waiting-players" id="waiting-players">
+      <div class="waiting-slot filled"><span class="wp-dot" style="background:#e85050"></span><span class="wp-name">小明（你）</span><span class="wp-host">👑 房主</span></div>
+      <div class="waiting-slot filled"><span class="wp-dot" style="background:#2d9e60"></span><span class="wp-name">小花</span><span class="wp-host"></span></div>
+      <div class="waiting-slot empty"><span class="wp-dot" style="background:#555"></span><span class="wp-name" style="color:#555">等待中…</span><span class="wp-host"></span></div>
+      <div class="waiting-slot empty"><span class="wp-dot" style="background:#555"></span><span class="wp-name" style="color:#555">等待中…</span><span class="wp-host"></span></div>
+    </div>
+    <div class="waiting-hint">2～4 人即可開始</div>
+    <button class="start-btn" id="online-start-btn" style="display:none;" onclick="window.fbStartGame&&window.fbStartGame()">✦ 開始遊戲 ✦</button>
   </div>
 </div>
 
@@ -883,7 +1279,7 @@ var COL_NAMES=['日治時期','中華民國解嚴前','中華民國解嚴後'];
 var CONFETTI_COLORS=['#e8161c','#ffcc00','#22aa44','#0055cc','#ff6600','#cc00cc','#00ccaa'];
 
 // ══ 狀態 ══
-var players=[],selectedCount=3,soloMode=false;
+var players=[],selectedCount=3,soloMode=false,onlineMode=false;
 var bookDeck=[],bonusDeck=[];
 var placed=[[],[],[]];
 var bonusUnlocked=false,currentPlayer=0;
@@ -913,6 +1309,15 @@ function renderInputs(){
   document.getElementById('player-inputs').innerHTML=html;
 }
 function startGame(){
+  if(window.onlineMode){
+    // 線上模式：players 已由 Firebase 設好，用 seed 做同步洗牌
+    var seed=window._roomSeed||Date.now();
+    bookDeck=seededShuffle(BOOK.slice(),seed); bonusDeck=seededShuffle(BONUS.slice(),seed+1);
+    placed=[[],[],[]]; bonusUnlocked=false; cardHistory={};
+    currentPlayer=0; curPhase='idle'; cur=null;
+    document.getElementById('screen-splash').classList.add('gone');
+    beginGame(); return;
+  }
   var names=[];
   for(var i=0;i<selectedCount;i++){
     var el=document.getElementById('pn'+i);
@@ -1163,6 +1568,11 @@ function placeCard(c,card,stamp){ card.stampRevealed=stamp; placed[c].push(card)
 function endTurn(cardPlaced){
   if(cardPlaced) delete cardHistory[cur.id];
   cur=null; curColConfirmed=-1; curIsRetry=false; curColScoredBefore=false; curPhase='idle';
+  if(window.onlineMode){
+    // 線上模式：currentPlayer 由 Firebase listener 更新，這裡先 render 現況
+    renderAll(); checkEnd();
+    return;
+  }
   if(!soloMode) currentPlayer=(currentPlayer+1)%players.length;
   document.getElementById('cur-card-wrap').innerHTML='<div class="cur-placeholder">等待抽牌</div>';
   document.getElementById('status-msg').textContent='選擇左側牌堆開始';
@@ -1190,6 +1600,11 @@ function showEnd(){
     showEndSolo();
   } else {
     showEndMulti();
+  }
+  // 線上模式關閉計時器和排行
+  if(window.onlineMode){
+    clearInterval(window._timerIv);
+    document.getElementById('turn-timer').classList.remove('show');
   }
   setTimeout(function(){spawnWinConfetti();},300);
   document.getElementById('screen-end').classList.add('show');
@@ -1269,9 +1684,19 @@ function addScore(idx,pts){
   if(pts<=0) return;
   players[idx].score+=pts;
   document.getElementById('pts'+idx).textContent=players[idx].score;
+  // 線上模式同步分數
+  if(window.onlineMode && players[idx].id===window._uid && window.fbAddScore){
+    window.fbAddScore(pts);
+  }
 }
 function shuffle(arr){
   for(var i=arr.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1)),t=arr[i];arr[i]=arr[j];arr[j]=t;}
+  return arr;
+}
+function seededShuffle(arr,seed){
+  var s=seed%2147483647; if(s<=0) s+=2147483646;
+  function rand(){ s=(s*16807)%2147483647; return (s-1)/2147483646; }
+  for(var i=arr.length-1;i>0;i--){var j=Math.floor(rand()*(i+1)),t=arr[i];arr[i]=arr[j];arr[j]=t;}
   return arr;
 }
 function closeModal(id){ document.getElementById(id).classList.remove('show'); }
@@ -1282,6 +1707,63 @@ var sfxIdx=0;
 setInterval(function(){ sfxIdx=(sfxIdx+1)%sfxList.length; document.getElementById('title-sfx').textContent=sfxList[sfxIdx]; },3000);
 
 renderInputs();
+
+// ══ 連線對戰 UI 函數（預覽版，無真實連線）══
+function showOnlineScreen(){
+  document.getElementById('screen-splash').classList.add('gone');
+  document.getElementById('screen-online').classList.remove('gone');
+  showPanel('online-panel-lobby');
+}
+function hideOnlineScreen(){
+  document.getElementById('screen-online').classList.add('gone');
+  document.getElementById('screen-splash').classList.remove('gone');
+}
+function showPanel(id){
+  ['online-panel-lobby','online-panel-create','online-panel-join','online-panel-waiting'].forEach(function(p){
+    document.getElementById(p).classList.add('gone');
+  });
+  document.getElementById(id).classList.remove('gone');
+}
+// Signal Firebase module that game JS is ready
+window._gameReady=true;
+// If Firebase already triggered startOnlineGame before JS loaded, run it now
+if(window._pendingOnlineStart) window.startGame();
+
+function showCreateRoom(){ showPanel('online-panel-create'); }
+function showJoinRoom(){ showPanel('online-panel-join'); }
+function backToLobby(){ showPanel('online-panel-lobby'); }
+function selectTime(t, btn){
+  document.querySelectorAll('.time-btn').forEach(function(b){ b.classList.remove('sel'); });
+  btn.classList.add('sel');
+}
+function showWaitingRoom(isJoin){
+  if(!isJoin){
+    // 建立房間
+    var name=document.getElementById('create-name').value.trim()||'玩家1';
+    var timeSec=parseInt(document.querySelector('.time-btn.sel').textContent)||10;
+    if(window.fbCreateRoom){ window.fbCreateRoom(name,timeSec); }
+    else { showPanel('online-panel-waiting'); }
+  } else {
+    // 加入房間
+    var name=document.getElementById('join-name').value.trim()||'玩家';
+    var code=document.getElementById('join-code').value.trim();
+    if(!code){alert('請輸入房間碼！');return;}
+    if(window.fbJoinRoom){ window.fbJoinRoom(code,name); }
+    else { showPanel('online-panel-waiting'); }
+  }
+}
 </script>
+
+<!-- 遊戲中排行榜（連線對戰用，預覽先隱藏）-->
+<div id="online-scoreboard">
+  <div class="osb-title">🏆 即時排行</div>
+  <div class="osb-row"><span class="osb-rank">🥇</span><span class="osb-name">阿明</span><span class="osb-pts">12</span></div>
+  <div class="osb-row"><span class="osb-rank">🥈</span><span class="osb-name">小花</span><span class="osb-pts">8</span></div>
+  <div class="osb-row"><span class="osb-rank">🥉</span><span class="osb-name">你</span><span class="osb-pts">5</span></div>
+</div>
+
+<!-- 回合計時器（連線對戰用，預覽先隱藏）-->
+<div id="turn-timer"><span id="timer-num">10</span></div>
+
 </body>
 </html>
