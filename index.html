@@ -73,6 +73,7 @@
       }
       if(data.status==='playing'){
         window._onlineCurrentPlayer=data.currentPlayer;
+        window._lastRoomData=data;
         updateOnlineTurnUI(data);
         if(data.players) syncOnlineScores(data.players);
       }
@@ -90,21 +91,29 @@
     await set(ref(db,'rooms/'+code+'/status'),'playing');
     await set(ref(db,'rooms/'+code+'/currentPlayer'),keys[0]);
     await set(ref(db,'rooms/'+code+'/seed'),Date.now());
-    await set(ref(db,'rooms/'+code+'/turnStarted'),serverTimestamp());
+    await set(ref(db,'rooms/'+code+'/turnStarted'),Date.now());
   };
 
-  // 換人
-  window.fbNextTurn = async function(data){
+  // 換人：任何玩家都可呼叫；用 expectedPlayer 比對避免重複換人（CAS）
+  window.fbNextTurn = async function(expectedPlayer){
     var code=window._roomCode;
-    if(!window._isHost) return;
-    var snap=await get(ref(db,'rooms/'+code+'/players'));
-    if(!snap.exists()) return;
-    var players=snap.val();
+    if(window._nextTurnLock) return;
+    window._nextTurnLock=true;
+    setTimeout(function(){ window._nextTurnLock=false; },2000);
+    var roomSnap=await get(ref(db,'rooms/'+code));
+    if(!roomSnap.exists()){ window._nextTurnLock=false; return; }
+    var roomData=roomSnap.val();
+    var players=roomData.players||{};
+    var curPlayer=roomData.currentPlayer;
+    // 若目前的 currentPlayer 已經不是預期的人，表示別人已經換過了，跳過
+    if(expectedPlayer && curPlayer!==expectedPlayer){ window._nextTurnLock=false; return; }
     var keys=Object.keys(players).sort(function(a,b){return (players[a].joinedAt||0)-(players[b].joinedAt||0);});
-    var idx=keys.indexOf(data.currentPlayer);
+    var idx=keys.indexOf(curPlayer);
+    if(idx===-1) idx=0;
     var next=keys[(idx+1)%keys.length];
     await set(ref(db,'rooms/'+code+'/currentPlayer'),next);
-    await set(ref(db,'rooms/'+code+'/turnStarted'),serverTimestamp());
+    await set(ref(db,'rooms/'+code+'/turnStarted'),Date.now());
+    window._nextTurnLock=false;
   };
 
   // 加分
@@ -153,6 +162,7 @@
 
   // 回合 UI
   var _timerInterval=null;
+  var _lastTurnKey='';  // 防止同一回合重複觸發換人
   function updateOnlineTurnUI(data){
     var isMyTurn=data.currentPlayer===myId();
     // sync currentPlayer index for renderTurnBanner
@@ -164,24 +174,35 @@
       el.style.pointerEvents=isMyTurn?'':'none';
       el.style.opacity=isMyTurn?'':'0.5';
     });
+    // turnStarted 存的是毫秒時間戳（非 serverTimestamp）
     if(data.turnStarted && data.timeSec){
+      var turnKey=data.currentPlayer+'_'+data.turnStarted;
+      if(turnKey===_lastTurnKey) return;  // 同一回合已設過計時器
+      _lastTurnKey=turnKey;
       clearInterval(_timerInterval);
       var timer=document.getElementById('turn-timer');
       var num=document.getElementById('timer-num');
+      timer.classList.remove('urgent');
       timer.classList.add('show');
       var started=data.turnStarted;
+      var timeSec=data.timeSec;
+      var _nextFired=false;
       _timerInterval=setInterval(function(){
-        var left=Math.ceil(data.timeSec-(Date.now()-started)/1000);
+        var left=Math.ceil(timeSec-(Date.now()-started)/1000);
         if(left<=0){
           clearInterval(_timerInterval);
           num.textContent='0';
           timer.classList.add('urgent');
-          if(isMyTurn && window._isHost) fbNextTurn(data);
+          // 任何客戶端都可觸發換人，CAS 機制避免重複換人
+          if(!_nextFired){
+            _nextFired=true;
+            fbNextTurn(data.currentPlayer);
+          }
           return;
         }
         num.textContent=left;
         timer.classList.toggle('urgent',left<=3);
-      },300);
+      },500);
     }
   }
 
@@ -1569,8 +1590,11 @@ function endTurn(cardPlaced){
   if(cardPlaced) delete cardHistory[cur.id];
   cur=null; curColConfirmed=-1; curIsRetry=false; curColScoredBefore=false; curPhase='idle';
   if(window.onlineMode){
-    // 線上模式：currentPlayer 由 Firebase listener 更新，這裡先 render 現況
+    // 線上模式：放牌成功算結束這回合，由結束回合的這位玩家自己請求換人
     renderAll(); checkEnd();
+    if(window._onlineCurrentPlayer===window._uid){
+      window.fbNextTurn(window._onlineCurrentPlayer);
+    }
     return;
   }
   if(!soloMode) currentPlayer=(currentPlayer+1)%players.length;
